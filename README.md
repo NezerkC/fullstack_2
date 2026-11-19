@@ -2,81 +2,146 @@
 
 **Asignatura:** DSY1104 FullStack II — Duoc UC  
 **Equipo de Desarrollo:** NezerkC, Daakhen, dysandoval  
-**Stack Tecnológico:** React 19 · Vite 8 · React-Bootstrap · React Router 7 · Vitest 5 · Testing Library · jest-axe  
+**Stack Tecnológico:** React 19 · Vite 8 · React-Bootstrap · React Router 7 · Vitest 5 · Testing Library · jest-axe · Axios · Docker (Multi-stage OCI) · Nginx Alpine  
 
 ---
 
 > [!NOTE]
 > ### 🏛️ ¿Dónde está el proyecto anterior (HTML / CSS / JS Vanilla)?
-> Todo el código, estilos, scripts, informe ERS y presentación de la **Etapa 1 (HTML estático)** se encuentra respaldado e intacto en la rama dedicada:
+> Todo el código, estilos, scripts, informe ERS y presentación de la **Etapa 1 (HTML estático)** se encuentra respaldado e intacto en la rama dedicada:  
 > 👉 **[`proyecto-html-base`](https://github.com/NezerkC/Prueba-Parcial-1/tree/proyecto-html-base)**
 >
-> La rama **`main`** (junto con `componentes`, `desing` y `test`) contiene exclusivamente la **Migración a React**.
+> La rama **`main`** contiene exclusivamente la **Migración a React** y la arquitectura de despliegue en contenedores.
 
 ---
 
-## 1. Estructura Limpia del Repositorio (`main`)
+## 1. Estructura del Repositorio (`main`)
 
 ```text
 Prueba-Parcial-1/
 │
-├── fullstack-react-parcial-1/   # ⚛️ Aplicación Principal en React (SPA)
-│   ├── public/assets/img/       # 56 recursos multimedia (instrumentos, logos SVG, videos MP4)
+├── fullstack-react-parcial-1/       # ⚛️ Aplicación Principal en React (SPA)
+│   ├── public/assets/img/           # 56 recursos multimedia (instrumentos, logos SVG, videos MP4)
 │   ├── src/
-│   │   ├── components/          # Componentes UI (Navbar, Footer, ProductCard, ProductGrid, home/)
-│   │   ├── context/             # Estado global del Carrito con localStorage (CartContext)
-│   │   ├── data/                # Catálogo de 51 productos (productos.js) y comunas (regiones.js)
-│   │   ├── hooks/               # Custom Hooks (useContador con límites de stock)
-│   │   ├── pages/               # Vistas de la aplicación (Home y páginas de la tienda)
-│   │   ├── services/            # Capa de consumo HTTP con Axios (api.js, ServicioAPI.js)
-│   │   ├── utils/               # Reglas de negocio (RUT Módulo 11, IVA 19%, nivel de stock)
-│   │   ├── App.jsx              # Enrutador principal (React Router)
-│   │   └── index.css            # Sistema de diseño Olivini Gold + Bootstrap 5
-│   ├── buildspec.yml            # Configuración CI/CD para AWS CodeBuild
-│   ├── package.json             # Dependencias y scripts de la app
-│   └── vite.config.js           # Configuración de Vite, Vitest (jsdom) y cobertura v8
+│   │   ├── components/              # Componentes UI reutilizables
+│   │   │   ├── common/              # Navbar, Footer, ProductCard, ProductGrid, FiltrosCatalogo, CartToast
+│   │   │   ├── home/                # HeroSection, FeaturedProducts, CustomObjectsSection, ModalCrearObjeto
+│   │   │   ├── checkout/            # ResumenPedido y componentes del flujo de compra
+│   │   │   ├── contacto/            # FormularioContacto (validación reactiva), DatosTienda, Horarios
+│   │   │   └── blogs/               # BlogCard y VideoArticulo
+│   │   ├── context/                 # Estado global transversal (React Context API)
+│   │   │   ├── AuthContext.jsx      # Sesión, roles (Admin/Cliente/Vendedor) y persistencia en localStorage
+│   │   │   └── CartContext.jsx      # Carrito, cálculo de IVA (19%), cantidades y storage reactivo
+│   │   ├── data/                    # Catálogo simulado (productos.js) y división política (regiones.js)
+│   │   ├── hooks/                   # Custom Hooks (useContador con cotas y límites de stock)
+│   │   ├── pages/                   # Vistas principales / Contenedores (Smart Components)
+│   │   │   ├── Home.jsx, Productos.jsx, ProductoDetalle.jsx, Categorias.jsx, Ofertas.jsx
+│   │   │   ├── Login.jsx, Registro.jsx, Carrito.jsx, Checkout.jsx, CompraExitosa.jsx, PagoFallido.jsx
+│   │   │   └── admin/               # Panel Administrativo protegido por roles
+│   │   │       ├── AdminDashboard.jsx   # Resumen de métricas y accesos rápidos
+│   │   │       ├── AdminProductos.jsx   # Mantenedor CRUD de catálogo e inventario
+│   │   │       └── AdminUsuarios.jsx    # Mantenedor de cuentas, roles y estados
+│   │   ├── services/                # Capa de consumo HTTP con Axios (api.js, ServicioAPI.js)
+│   │   ├── utils/                   # Lógica pura de negocio (RUT Módulo 11, finanzas/IVA, stock, checkout)
+│   │   ├── App.jsx                  # Enrutador principal y Route Guards (<RutaAdmin>)
+│   │   └── index.css                # Sistema de diseño Olivini Gold + Bootstrap 5
+│   ├── buildspec.yml                # Configuración CI/CD para AWS CodeBuild
+│   ├── package.json                 # Dependencias y scripts de la app cliente
+│   └── vite.config.js               # Configuración de Vite, Vitest (jsdom) y cobertura V8
 │
-├── docs/migracion/              # 📚 Documentación Técnica y Arquitectura de Migración
-│   ├── 01-auditoria-arquitectura-base-html-vs-entorno-pruebas.md
-│   ├── 02-descomposicion-atomic-design.md
-│   ├── 03-guia-migracion-tdd-vitest.md
-│   ├── 04-testing-y-cobertura-vitest.md
-│   ├── 05-estrategia-git-cicd-cloud-y-base-de-datos.md
-│   └── 06-flujo-colaborativo-git-ramas-y-trabajo-en-equipo.md
+├── docs/                            # 📚 Documentación Técnica, Arquitectura y Rúbricas
+│   ├── arquitectura-docker-despliegue.md   # Especificación de contenedores OCI multi-stage y Nginx
+│   ├── Defensa_Tecnica_Arquitectura_React_EP2.md  # Justificación técnica de patrones, Clean Architecture y a11y
+│   ├── Informe_Cobertura_Testing_Sonido_Vivo_EP2.docx # Reporte formal de métricas de cobertura
+│   └── migracion/                   # Guías de arquitectura, Atomic Design, TDD y Git
 │
-├── .github/workflows/ci.yml     # 🤖 Pipeline CI en GitHub Actions (Linter + Vitest + Build)
-├── .devcontainer/               # ☁️ Configuración lista para GitHub Codespaces
-└── package.json                 # Orquestador raíz (npm workspaces)
+├── Dockerfile                       # Construcción multi-etapa: Builder (Node 20) -> Runner (Nginx Alpine)
+├── docker-compose.yml               # Orquestación de contenedor con healthcheck (puerto 3050:80)
+├── nginx.conf                       # Configuración Nginx de producción: compresión Gzip y fallback SPA
+├── .github/workflows/ci.yml         # 🤖 Pipeline CI en GitHub Actions (Linter + Vitest + Build)
+├── .devcontainer/                   # ☁️ Configuración lista para GitHub Codespaces
+└── package.json                     # Orquestador raíz (npm workspaces)
 ```
 
 ---
 
-## 2. Inicio Rápido para el Equipo
+## 2. Inicio Rápido
 
-Puedes ejecutar los comandos desde la raíz del repositorio o entrando a `fullstack-react-parcial-1/`:
+### Opción A: Entorno Local de Desarrollo (Node.js / Vite)
 
 ```bash
-# 1. Sincronizar con la rama principal
+# 1. Clonar o sincronizar la rama principal
 git switch main
 git pull origin main
 
 # 2. Instalar dependencias
 npm install
 
-# 3. Iniciar servidor de desarrollo (http://localhost:5173)
+# 3. Iniciar servidor de desarrollo en http://localhost:5173
 npm run dev
+```
 
-# 4. Ejecutar las 30 pruebas unitarias (Vitest)
-npm run test:run
+### Opción B: Ejecución Contenerizada (Docker & Docker Compose)
 
-# 5. Verificar linter y reporte de cobertura
-npm run lint
-npm run coverage
+Construye una imagen ultraligera optimizada con Nginx Alpine (<30 MB) con compresión Gzip y soporte para enrutamiento SPA:
+
+```bash
+# Construir y levantar el contenedor en segundo plano
+docker compose up --build -d
+
+# Acceder en el navegador:
+# http://localhost:3050
+```
+
+Para detener el servicio:
+```bash
+docker compose down
 ```
 
 ---
 
-## 3. Mapa de Ramas y Flujo Colaborativo en Git
+## 3. Pruebas Unitarias y Cobertura (Vitest + V8)
+
+La suite cuenta con **más de 110 pruebas unitarias automatizadas** distribuidas en 30 archivos de prueba (`.test.jsx` / `.test.js`), ejecutadas en un entorno virtual DOM aislado (`jsdom`) con instrumentación V8 nativa:
+
+```bash
+# Ejecutar todas las pruebas unitarias en una sola pasada
+npm run test:run
+
+# Generar reporte completo de cobertura de código
+npm run coverage
+
+# Ejecutar el linter de código (ESLint)
+npm run lint
+
+# Compilar bundle estático para producción (/dist)
+npm run build
+```
+
+### Métricas de Cobertura Obtenidas (V8):
+
+| Métrica | Meta Rúbrica Duoc | Cobertura Obtenida | Estado |
+| :--- | :---: | :---: | :---: |
+| **Líneas** | 80% | **> 85%** | ✅ Cumplido |
+| **Sentencias (Stmts)** | 80% | **> 84%** | ✅ Cumplido |
+| **Funciones** | 70% | **> 77%** | ✅ Cumplido |
+| **Ramas (Branches)** | 70% | **> 76%** | ✅ Cumplido |
+
+---
+
+## 4. Usuarios y Roles de Demostración
+
+Para probar los flujos con control de acceso y roles (`AuthContext`):
+
+| Rol | Correo Electrónico | Contraseña | Permisos y Vistas |
+| :--- | :--- | :--- | :--- |
+| **Administrador** | `admin@profesor.duoc.cl` | `123456` | Acceso completo a `/admin`, mantenedor de productos e inventario, y mantenedor de usuarios y roles. |
+| **Cliente** | `cliente@duoc.cl` | `pass12` | Catálogo, carrito, checkout con autocompletado de datos de envío y compra simulada. |
+| **Cliente Alternativo** | `usuario@gmail.com` | `pass12` | Cuenta cliente con dirección en Región Metropolitana. |
+
+---
+
+## 5. Mapa de Ramas y Flujo Colaborativo en Git
 
 ```text
  ┌────────────────────────────────────────────────────────────────────────┐
@@ -91,21 +156,22 @@ npm run coverage
  📦 proyecto-html-base  --> Rama histórica con el proyecto HTML/CSS/JS original intacto
 ```
 
-### Asignación de Roles del Equipo (ver detalle en [`docs/migracion/06`](docs/migracion/06-flujo-colaborativo-git-ramas-y-trabajo-en-equipo.md))
+### Asignación de Roles del Equipo (ver [`docs/migracion/06`](docs/migracion/06-flujo-colaborativo-git-ramas-y-trabajo-en-equipo.md))
 
-| Integrante | Rol Principal | Ramas de Trabajo | Entregables en React |
-| :--- | :--- | :--- | :--- |
-| **NezerkC** | *Arquitectura, Auth & Carrito* | `feat/routing-navegacion`<br>`feat/auth-login-registro`<br>`feat/carrito-compras` | Rutas en `App.jsx`, Setup Vite/Vitest, Login (`/login`), Registro (`/registro`) y Carrito de compras (`/carrito`). |
-| **Daakhen** | *Catálogo, Vistas & Diseño* | `desing`<br>`feat/catalogo-productos`<br>`feat/producto-detalle` | Catálogo con filtros (`/productos`), detalle de producto (`/producto/:codigo`), Nosotros y Blogs. |
-| **dysandoval** | *Admin, Validación & TDD* | `test`<br>`feat/panel-admin`<br>`feat/validaciones-test` | Dashboard y mantenedor CRUD Administrativo (`/admin`), utilidades y suite de pruebas TDD. |
+| Integrante | Rol Principal | Entregables Clave |
+| :--- | :--- | :--- |
+| **NezerkC** | *Arquitectura, Auth, Carrito & Admin* | Enrutamiento en `App.jsx`, Setup Vite/Vitest, Login/Registro, Carrito/Checkout, Mantenedor de Usuarios (`AdminUsuarios`) e Infraestructura Docker. |
+| **Daakhen** | *Catálogo, Vistas & Diseño* | Catálogo con filtros y ordenamiento (`Productos.jsx`), Ficha de Producto (`ProductoDetalle.jsx`), Instrumentos Personalizados, Nosotros y Blogs. |
+| **dysandoval** | *Admin Productos, Validación & TDD* | Dashboard y mantenedor CRUD de Productos (`AdminProductos`), utilidades de cálculo tributario (IVA) y suite de pruebas unitarias. |
 
 ---
 
-## 4. Estándar de Commits (Conventional Commits)
+## 6. Estándar de Commits (Conventional Commits)
 
 ```bash
 git commit -m "feat(catalogo): implementar filtro por categoria y buscador en vivo"
 git commit -m "feat(carrito): construir tabla de productos y resumen de pago con IVA"
 git commit -m "test(validaciones): agregar pruebas de borde para formulario de registro"
 git commit -m "style(ui): ajustar espaciado responsive en tarjetas de producto"
+git commit -m "feat(infra): agregar dockerfile multi-stage y compose con nginx"
 ```
