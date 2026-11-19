@@ -192,19 +192,32 @@ function guardarCatalogoLocal(catalogo) {
 export function calcularMetricasLocales(catalogo = obtenerCatalogoActivo()) {
   const lista = Array.isArray(catalogo) ? catalogo : [];
   const totalProductos = lista.length;
-  const totalUnidades = lista.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
+  const totalUnidades = lista.reduce(
+    (acc, p) => acc + (Number(p.stock !== undefined ? p.stock : p.stock_disponible) || 0),
+    0
+  );
   const valoracionTotal = lista.reduce(
-    (acc, p) => acc + (Number(p.precio) || 0) * (Number(p.stock) || 0),
+    (acc, p) =>
+      acc +
+      (Number(p.precio !== undefined ? p.precio : p.precio_clp) || 0) *
+        (Number(p.stock !== undefined ? p.stock : p.stock_disponible) || 0),
     0
   );
   const productosCriticos = lista.filter(
-    (p) => (Number(p.stock) || 0) <= (p.stockCritico ?? 3)
+    (p) =>
+      (Number(p.stock !== undefined ? p.stock : p.stock_disponible) || 0) <=
+      (p.stockCritico ?? 3)
   );
+  const categoriasSet = new Set(lista.map((p) => p.categoria).filter(Boolean));
 
   return {
+    capitalTotal: valoracionTotal,
     valoracionTotal,
     totalProductos,
+    unidadesTotales: totalUnidades,
     totalUnidades,
+    categoriasActivas: categoriasSet.size,
+    totalCategorias: categoriasSet.size,
     productosCriticos: productosCriticos.length,
     alertasStockCritico: productosCriticos.length,
     detalleCriticos: productosCriticos,
