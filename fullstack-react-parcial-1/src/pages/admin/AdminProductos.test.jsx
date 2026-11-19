@@ -1,7 +1,8 @@
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import AdminProductos from './AdminProductos';
 import { CLAVE_INVENTARIO_STORAGE } from '../../data/productos';
+import * as productoService from '../../services/productoService';
 
 const INVENTARIO_PRUEBA = [
   {
@@ -48,6 +49,10 @@ describe('<AdminProductos /> (CRUD de inventario)', () => {
   beforeEach(() => {
     localStorage.clear();
     localStorage.setItem(CLAVE_INVENTARIO_STORAGE, JSON.stringify(INVENTARIO_PRUEBA));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('lista los productos guardados en el inventario', () => {
@@ -131,5 +136,93 @@ describe('<AdminProductos /> (CRUD de inventario)', () => {
     fireEvent.click(container.querySelector('#btn-guardar-modal'));
 
     expect(container.querySelector('#fila-AC099')).toBeInTheDocument();
+  });
+
+  it('renderiza AdminMongoKpis con métricas locales ($ 2.700.000) y MongoQueryBar (filtra por búsqueda y estado)', () => {
+    const { container } = renderAdmin();
+
+    // AdminMongoKpis debe calcular: 150000*10 + 600000*2 = 1500000 + 1200000 = 2700000
+    expect(screen.getByText('$ 2.700.000')).toBeInTheDocument();
+
+    // MongoQueryBar: Buscar por nombre
+    const inputBusqueda = screen.getByLabelText(/buscar en colección productos/i);
+    fireEvent.change(inputBusqueda, { target: { value: 'Bajo' } });
+
+    expect(container.querySelector('#fila-BA001')).toBeInTheDocument();
+    expect(container.querySelector('#fila-GA001')).not.toBeInTheDocument();
+
+    // Limpiar búsqueda y filtrar por estado AGOTADO (ninguno debe aparecer pues ambos tienen stock > 0)
+    fireEvent.change(inputBusqueda, { target: { value: '' } });
+    const selectEstado = screen.getByLabelText(/estado/i);
+    fireEvent.change(selectEstado, { target: { value: 'AGOTADO' } });
+
+    expect(container.querySelector('#fila-GA001')).not.toBeInTheDocument();
+    expect(container.querySelector('#fila-BA001')).not.toBeInTheDocument();
+  });
+
+  it('clic en btn-stock-inc-GA001 y btn-stock-dec-GA001 actualiza stock reactivamente y llama a ajustarStock', () => {
+    const spyAjustar = vi.spyOn(productoService, 'ajustarStock').mockResolvedValue({});
+    const { container } = renderAdmin();
+
+    const btnInc = screen.getByTestId('btn-stock-inc-GA001');
+    const btnDec = screen.getByTestId('btn-stock-dec-GA001');
+
+    fireEvent.click(btnInc);
+
+    expect(inventarioGuardado().find((p) => p.codigo === 'GA001').stock).toBe(11);
+    expect(container.querySelector('#fila-GA001')).toHaveTextContent('11');
+    expect(spyAjustar).toHaveBeenCalledWith(
+      'GA001',
+      1,
+      'INGRESO_PROVEEDOR',
+      undefined
+    );
+
+    fireEvent.click(btnDec);
+    expect(inventarioGuardado().find((p) => p.codigo === 'GA001').stock).toBe(10);
+    expect(container.querySelector('#fila-GA001')).toHaveTextContent('10');
+    expect(spyAjustar).toHaveBeenCalledWith(
+      'GA001',
+      -1,
+      'VENTA_DIRECTA_MOSTRADOR',
+      undefined
+    );
+  });
+
+  it('clic en btn-inspeccionar-GA001 abre BsonDocumentDrawer y agregar reseña invoca productoService.agregarResena', () => {
+    const spyResena = vi.spyOn(productoService, 'agregarResena').mockResolvedValue({});
+    renderAdmin();
+
+    const btnInspeccionar = screen.getByTestId('btn-inspeccionar-GA001');
+    fireEvent.click(btnInspeccionar);
+
+    const dialog = screen.getByRole('dialog', { name: /inspector de documento bson/i });
+    expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('GA001');
+
+    // Agregar reseña
+    const inputCliente = screen.getByLabelText(/nombre del cliente/i);
+    const selectCalif = screen.getByLabelText(/calificación/i);
+    const inputComentario = screen.getByLabelText(/comentario/i);
+    const btnAgregar = screen.getByRole('button', { name: /agregar reseña/i });
+
+    fireEvent.change(inputCliente, { target: { value: 'Laura M.' } });
+    fireEvent.change(selectCalif, { target: { value: '5' } });
+    fireEvent.change(inputComentario, { target: { value: 'Excelente guitarra acústica.' } });
+    fireEvent.click(btnAgregar);
+
+    expect(spyResena).toHaveBeenCalledWith(
+      'GA001',
+      {
+        cliente: 'Laura M.',
+        calificacion: 5,
+        comentario: 'Excelente guitarra acústica.',
+      },
+      undefined
+    );
+
+    const prodActualizado = inventarioGuardado().find((p) => p.codigo === 'GA001');
+    expect(prodActualizado.resenas).toHaveLength(1);
+    expect(prodActualizado.resenas[0].cliente).toBe('Laura M.');
   });
 });

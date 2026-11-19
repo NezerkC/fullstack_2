@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   PRODUCTOS_SONIDO_VIVO,
   CATEGORIAS_SONIDO_VIVO,
@@ -6,6 +6,18 @@ import {
   formatearPrecioCLP,
   obtenerRutaImagen,
 } from '../../data/productos';
+import AdminMongoKpis from '../../components/admin/AdminMongoKpis';
+import MongoQueryBar, { CATEGORIAS_HOMOLOGADAS } from '../../components/admin/MongoQueryBar';
+import BsonDocumentDrawer from '../../components/admin/BsonDocumentDrawer';
+import {
+  obtenerProductos,
+  obtenerMetricas,
+  crearProducto,
+  actualizarProducto,
+  eliminarProducto,
+  ajustarStock,
+  agregarResena,
+} from '../../services/productoService';
 
 const PRODUCTO_VACIO = {
   codigo: '',
@@ -98,72 +110,49 @@ function ModalProducto({ producto, onGuardar, onCerrar }) {
           borderRadius: 'var(--radius-lg, 12px)',
           padding: '2rem',
           width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto',
-          boxShadow: 'var(--shadow-elevated, 0 20px 40px rgba(18, 25, 13, 0.25))',
+          boxShadow: 'var(--shadow-elevated)',
           border: '1px solid var(--color-border, #E2DDD0)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border, #E2DDD0)', paddingBottom: '0.75rem' }}>
           <h2 style={{ margin: 0, color: 'var(--color-text-main, #1A2413)', fontSize: '1.25rem', fontWeight: 800 }}>
-            {esNuevo ? '➕ Registrar Nuevo Producto' : '✏️ Editar Producto'}
+            {esNuevo ? '✨ Agregar Nuevo Producto' : `✏️ Editar: ${producto.nombre}`}
           </h2>
           <button
-            id="btn-cerrar-modal"
+            type="button"
             onClick={onCerrar}
-            style={{ background: 'none', border: 'none', color: 'var(--color-text-muted, #615E54)', cursor: 'pointer', fontSize: '1.4rem', lineHeight: 1 }}
-            aria-label="Cerrar modal"
-          >×</button>
+            style={{
+              background: 'none', border: 'none', fontSize: '1.25rem',
+              cursor: 'pointer', color: 'var(--color-text-muted, #615E54)',
+              lineHeight: 1, padding: '0.25rem',
+            }}
+          >
+            ✕
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             {/* Código */}
             <div>
-              <label style={labelStyle}>Código *</label>
+              <label style={labelStyle}>Código (SKU) *</label>
               <input
                 id="input-codigo"
+                type="text"
+                disabled={!esNuevo}
                 value={form.codigo}
                 onChange={(e) => handleChange('codigo', e.target.value.toUpperCase())}
-                disabled={!esNuevo}
-                placeholder="GA001"
-                style={{ ...inputStyle('codigo'), opacity: !esNuevo ? 0.6 : 1, background: !esNuevo ? 'var(--color-surface-hover, #F3EFE3)' : '#ffffff' }}
+                placeholder="EJ: GA001"
+                style={{
+                  ...inputStyle('codigo'),
+                  background: !esNuevo ? 'var(--color-surface-hover, #F3EFE3)' : '#ffffff',
+                  cursor: !esNuevo ? 'not-allowed' : 'text',
+                }}
               />
               {errores.codigo && <span style={{ color: 'var(--color-danger, #A33A3A)', fontSize: '0.75rem', fontWeight: 600 }}>{errores.codigo}</span>}
             </div>
-            {/* Icono */}
-            <div>
-              <label style={labelStyle}>Icono</label>
-              <input
-                id="input-icono"
-                value={form.icono}
-                onChange={(e) => handleChange('icono', e.target.value)}
-                placeholder="🎸"
-                style={inputStyle('icono')}
-              />
-            </div>
-            {/* Nombre */}
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Nombre *</label>
-              <input
-                id="input-nombre"
-                value={form.nombre}
-                onChange={(e) => handleChange('nombre', e.target.value)}
-                placeholder="Guitarra Acústica Folk"
-                style={inputStyle('nombre')}
-              />
-              {errores.nombre && <span style={{ color: 'var(--color-danger, #A33A3A)', fontSize: '0.75rem', fontWeight: 600 }}>{errores.nombre}</span>}
-            </div>
-            {/* Marca */}
-            <div>
-              <label style={labelStyle}>Marca</label>
-              <input id="input-marca" value={form.marca} onChange={(e) => handleChange('marca', e.target.value)} placeholder="Yamaha" style={inputStyle('marca')} />
-            </div>
-            {/* Modelo */}
-            <div>
-              <label style={labelStyle}>Modelo</label>
-              <input id="input-modelo" value={form.modelo} onChange={(e) => handleChange('modelo', e.target.value)} placeholder="F310" style={inputStyle('modelo')} />
-            </div>
             {/* Categoría */}
-            <div style={{ gridColumn: '1 / -1' }}>
+            <div>
               <label style={labelStyle}>Categoría *</label>
               <select
                 id="select-categoria"
@@ -177,6 +166,43 @@ function ModalProducto({ producto, onGuardar, onCerrar }) {
                 ))}
               </select>
               {errores.categoria && <span style={{ color: 'var(--color-danger, #A33A3A)', fontSize: '0.75rem', fontWeight: 600 }}>{errores.categoria}</span>}
+            </div>
+            {/* Nombre */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Nombre del Producto *</label>
+              <input
+                id="input-nombre"
+                type="text"
+                value={form.nombre}
+                onChange={(e) => handleChange('nombre', e.target.value)}
+                placeholder="Guitarra Acústica Cutaway"
+                style={inputStyle('nombre')}
+              />
+              {errores.nombre && <span style={{ color: 'var(--color-danger, #A33A3A)', fontSize: '0.75rem', fontWeight: 600 }}>{errores.nombre}</span>}
+            </div>
+            {/* Marca */}
+            <div>
+              <label style={labelStyle}>Marca</label>
+              <input
+                id="input-marca"
+                type="text"
+                value={form.marca}
+                onChange={(e) => handleChange('marca', e.target.value)}
+                placeholder="Fender, Gibson, etc."
+                style={inputStyle('marca')}
+              />
+            </div>
+            {/* Modelo */}
+            <div>
+              <label style={labelStyle}>Modelo</label>
+              <input
+                id="input-modelo"
+                type="text"
+                value={form.modelo}
+                onChange={(e) => handleChange('modelo', e.target.value)}
+                placeholder="Standard, Custom, etc."
+                style={inputStyle('modelo')}
+              />
             </div>
             {/* Precio */}
             <div>
@@ -249,13 +275,13 @@ function ModalProducto({ producto, onGuardar, onCerrar }) {
               type="submit"
               id="btn-guardar-modal"
               style={{
-                padding: '0.7rem 1.5rem', borderRadius: 'var(--radius-sm, 4px)',
-                background: 'var(--color-primary, #1A2413)',
-                border: 'none', color: 'var(--color-bg, #FAF8F2)', cursor: 'pointer',
-                fontWeight: 700, fontSize: '0.9rem', boxShadow: 'var(--shadow-sm)',
+                padding: '0.7rem 1.4rem', borderRadius: 'var(--radius-sm, 4px)',
+                background: 'var(--color-primary, #1A2413)', border: 'none',
+                color: 'var(--color-bg, #FAF8F2)', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem',
+                boxShadow: 'var(--shadow-sm)',
               }}
             >
-              {esNuevo ? '💾 Crear Producto' : '💾 Guardar Cambios'}
+              Guardar Producto
             </button>
           </div>
         </form>
@@ -267,51 +293,56 @@ function ModalProducto({ producto, onGuardar, onCerrar }) {
 function ModalConfirmarEliminar({ producto, onConfirmar, onCerrar }) {
   return (
     <div
-      id="modal-confirmar-overlay"
+      id="modal-eliminar-overlay"
       style={{
         position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)',
         backdropFilter: 'blur(3px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 9999, padding: '1rem',
       }}
+      onClick={(e) => e.target.id === 'modal-eliminar-overlay' && onCerrar()}
     >
-      <div style={{
-        background: 'var(--color-surface, #ffffff)', borderRadius: 'var(--radius-lg, 12px)', padding: '2rem',
-        width: '100%', maxWidth: '420px',
-        border: '1px solid var(--color-border, #E2DDD0)',
-        boxShadow: 'var(--shadow-elevated)',
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🗑️</div>
-          <h2 style={{ color: 'var(--color-danger, #A33A3A)', fontSize: '1.25rem', fontWeight: 800, margin: '0 0 0.5rem' }}>Eliminar Producto</h2>
-          <p style={{ color: 'var(--color-text-muted, #615E54)', fontSize: '0.92rem', margin: 0, lineHeight: 1.5 }}>
-            ¿Estás seguro de que deseas eliminar{' '}
-            <strong style={{ color: 'var(--color-text-main, #1A2413)' }}>{producto?.nombre}</strong>?
-            Esta acción no se puede deshacer.
-          </p>
-        </div>
+      <div
+        style={{
+          background: 'var(--color-surface, #ffffff)',
+          borderRadius: 'var(--radius-lg, 12px)',
+          padding: '2rem', width: '100%', maxWidth: '440px',
+          boxShadow: 'var(--shadow-elevated)',
+          border: '1px solid var(--color-border, #E2DDD0)',
+        }}
+      >
+        <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: '0.75rem' }}>⚠️</div>
+        <h3 style={{ margin: '0 0 0.5rem', color: 'var(--color-text-main, #1A2413)', fontSize: '1.15rem', textAlign: 'center', fontWeight: 800 }}>
+          ¿Descontinuar este producto?
+        </h3>
+        <p style={{ color: 'var(--color-text-muted, #615E54)', fontSize: '0.88rem', textAlign: 'center', margin: '0 0 1.5rem', lineHeight: 1.5 }}>
+          Vas a eliminar <strong>{producto.nombre}</strong> ({producto.codigo}). Esta acción no se puede deshacer.
+        </p>
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
           <button
+            type="button"
             id="btn-cancelar-eliminar"
             onClick={onCerrar}
             style={{
-              padding: '0.65rem 1.4rem', borderRadius: 'var(--radius-sm, 4px)',
+              padding: '0.65rem 1.25rem', borderRadius: 'var(--radius-sm, 4px)',
               background: 'var(--color-surface, #ffffff)', border: '1px solid var(--color-border, #E2DDD0)',
-              color: 'var(--color-text-muted, #615E54)', cursor: 'pointer', fontWeight: 600,
+              color: 'var(--color-text-muted, #615E54)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
             }}
           >
             Cancelar
           </button>
           <button
+            type="button"
             id="btn-confirmar-eliminar"
             onClick={() => onConfirmar(producto)}
             style={{
-              padding: '0.65rem 1.5rem', borderRadius: 'var(--radius-sm, 4px)',
-              background: 'var(--color-danger, #A33A3A)',
-              border: 'none', color: '#ffffff', cursor: 'pointer', fontWeight: 700,
+              padding: '0.65rem 1.25rem', borderRadius: 'var(--radius-sm, 4px)',
+              background: 'var(--color-danger, #A33A3A)', border: 'none',
+              color: '#ffffff', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem',
+              boxShadow: 'var(--shadow-sm)',
             }}
           >
-            Sí, eliminar
+            Sí, Eliminar
           </button>
         </div>
       </div>
@@ -331,23 +362,139 @@ export default function AdminProductos() {
 
   const [busqueda, setBusqueda] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
   const [modalProducto, setModalProducto] = useState(null);
   const [modalEliminar, setModalEliminar] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
+
+  // Estados de integración NoSQL / MongoDB
+  const [productoInspeccionado, setProductoInspeccionado] = useState(null);
+  const [metricasBackend, setMetricasBackend] = useState(null);
+  const [cargandoMetricas, setCargandoMetricas] = useState(false);
+  const [errorMetricas, setErrorMetricas] = useState(null);
+
+  const sincronizarBackend = useCallback(async () => {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+
+    setCargandoMetricas(true);
+    setErrorMetricas(null);
+    try {
+      const [prodsRes, metricsRes] = await Promise.all([
+        obtenerProductos({}, token),
+        obtenerMetricas(token),
+      ]);
+      if (Array.isArray(prodsRes) && prodsRes.length > 0) {
+        setInventario(prodsRes);
+        try {
+          localStorage.setItem(CLAVE_INVENTARIO_STORAGE, JSON.stringify(prodsRes));
+        } catch {
+          // ignore
+        }
+      }
+      if (metricsRes) {
+        setMetricasBackend(metricsRes);
+      }
+    } catch (err) {
+      setErrorMetricas(err?.message || 'Error al conectar con MongoDB');
+    } finally {
+      setCargandoMetricas(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelado = false;
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCargandoMetricas(true);
+    setErrorMetricas(null);
+
+    Promise.all([
+      obtenerProductos({}, token),
+      obtenerMetricas(token),
+    ])
+      .then(([prodsRes, metricsRes]) => {
+        if (cancelado) return;
+        if (Array.isArray(prodsRes) && prodsRes.length > 0) {
+          setInventario(prodsRes);
+          try {
+            localStorage.setItem(CLAVE_INVENTARIO_STORAGE, JSON.stringify(prodsRes));
+          } catch {
+            // ignore
+          }
+        }
+        if (metricsRes) {
+          setMetricasBackend(metricsRes);
+        }
+      })
+      .catch((err) => {
+        if (cancelado) return;
+        setErrorMetricas(err?.message || 'Error al conectar con MongoDB');
+      })
+      .finally(() => {
+        if (!cancelado) {
+          setCargandoMetricas(false);
+        }
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   const persistir = useCallback((nuevaLista) => {
     setInventario(nuevaLista);
     try {
       localStorage.setItem(CLAVE_INVENTARIO_STORAGE, JSON.stringify(nuevaLista));
     } catch {
-      // Ignorar error de cuota en entornos restringidos
+      // ignore
     }
   }, []);
 
   const mostrarToast = useCallback((msg) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+    setTimeout(() => setToastMsg(null), 3000);
   }, []);
+
+  // Métricas locales calculadas reactivamente a partir del inventario
+  const metricasLocales = useMemo(() => {
+    const capitalBodega = inventario.reduce(
+      (acc, p) => acc + (Number(p.precio) || 0) * (Number(p.stock) || 0),
+      0
+    );
+    const unidadesTotales = inventario.reduce(
+      (acc, p) => acc + (Number(p.stock) || 0),
+      0
+    );
+    const totalProductos = inventario.length;
+    const categoriasSet = new Set(inventario.map((p) => p.categoria).filter(Boolean));
+    const totalCategorias = categoriasSet.size;
+    const productosCriticos = inventario.filter(
+      (p) => (Number(p.stock) || 0) <= (p.stockCritico ?? 3)
+    ).length;
+
+    return {
+      capitalBodega,
+      unidadesTotales,
+      totalProductos,
+      totalCategorias,
+      productosCriticos,
+    };
+  }, [inventario]);
+
+  const metricasVisibles = metricasBackend || metricasLocales;
+
+  // Categorías combinadas y deduplicadas
+  const categoriasDisponibles = useMemo(() => {
+    const set = new Set([
+      ...CATEGORIAS_SONIDO_VIVO,
+      ...CATEGORIAS_HOMOLOGADAS,
+      ...inventario.map((p) => p.categoria).filter(Boolean),
+    ]);
+    return Array.from(set);
+  }, [inventario]);
 
   const productosFiltrados = useMemo(() => {
     return inventario.filter((p) => {
@@ -356,32 +503,110 @@ export default function AdminProductos() {
         p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
         p.codigo.toLowerCase().includes(busqueda.toLowerCase()) ||
         (p.marca && p.marca.toLowerCase().includes(busqueda.toLowerCase()));
+
       const coincideCat = !filtroCategoria || p.categoria === filtroCategoria;
-      return coincideBusqueda && coincideCat;
+
+      const estadoProd = p.estado || (Number(p.stock) === 0 ? 'AGOTADO' : 'ACTIVO');
+      const coincideEstado = !filtroEstado || estadoProd === filtroEstado;
+
+      return coincideBusqueda && coincideCat && coincideEstado;
     });
-  }, [inventario, busqueda, filtroCategoria]);
+  }, [inventario, busqueda, filtroCategoria, filtroEstado]);
+
+  const handleAjustarStock = useCallback(
+    (prod, delta) => {
+      const token = (typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null) || undefined;
+      const nuevoStock = Math.max(0, (Number(prod.stock) || 0) + delta);
+      const nuevaLista = inventario.map((p) =>
+        p.codigo === prod.codigo ? { ...p, stock: nuevoStock } : p
+      );
+      persistir(nuevaLista);
+
+      if (productoInspeccionado && productoInspeccionado.codigo === prod.codigo) {
+        setProductoInspeccionado((prev) => (prev ? { ...prev, stock: nuevoStock } : null));
+      }
+
+      setMetricasBackend(null);
+
+      const motivo = delta > 0 ? 'INGRESO_PROVEEDOR' : 'VENTA_DIRECTA_MOSTRADOR';
+      ajustarStock(prod.codigo, delta, motivo, token).catch(() => {});
+    },
+    [inventario, persistir, productoInspeccionado]
+  );
 
   const handleGuardar = useCallback(
     (productoEditado) => {
+      const token = (typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null) || undefined;
       const esNuevo = !inventario.find((p) => p.codigo === productoEditado.codigo);
       const nuevaLista = esNuevo
         ? [...inventario, productoEditado]
         : inventario.map((p) => (p.codigo === productoEditado.codigo ? productoEditado : p));
       persistir(nuevaLista);
       setModalProducto(null);
-      mostrarToast(esNuevo ? `✅ "${productoEditado.nombre}" creado exitosamente` : `✅ "${productoEditado.nombre}" actualizado`);
+      setMetricasBackend(null);
+      mostrarToast(
+        esNuevo
+          ? `✅ "${productoEditado.nombre}" creado exitosamente`
+          : `✅ "${productoEditado.nombre}" actualizado`
+      );
+
+      const llamada = esNuevo
+        ? crearProducto(productoEditado, token)
+        : actualizarProducto(productoEditado.codigo, productoEditado, token);
+      llamada.catch(() => {});
     },
     [inventario, persistir, mostrarToast]
   );
 
   const handleEliminar = useCallback(
     (producto) => {
+      const token = (typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null) || undefined;
       const nuevaLista = inventario.filter((p) => p.codigo !== producto.codigo);
       persistir(nuevaLista);
       setModalEliminar(null);
+      setMetricasBackend(null);
       mostrarToast(`🗑️ "${producto.nombre}" eliminado`);
+
+      eliminarProducto(producto.codigo, token).catch(() => {});
     },
     [inventario, persistir, mostrarToast]
+  );
+
+  const handleAgregarResena = useCallback(
+    (codigo, resena) => {
+      const token = (typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null) || undefined;
+      const resenaCompleta = {
+        ...resena,
+        fecha: new Date().toISOString().slice(0, 10),
+      };
+
+      const nuevaLista = inventario.map((p) => {
+        if (p.codigo === codigo) {
+          const resenasActuales = Array.isArray(p.resenas) ? p.resenas : [];
+          return {
+            ...p,
+            resenas: [...resenasActuales, resenaCompleta],
+          };
+        }
+        return p;
+      });
+
+      persistir(nuevaLista);
+
+      setProductoInspeccionado((prev) => {
+        if (prev && prev.codigo === codigo) {
+          const resenasActuales = Array.isArray(prev.resenas) ? prev.resenas : [];
+          return {
+            ...prev,
+            resenas: [...resenasActuales, resenaCompleta],
+          };
+        }
+        return prev;
+      });
+
+      agregarResena(codigo, resena, token).catch(() => {});
+    },
+    [inventario, persistir]
   );
 
   const thStyle = {
@@ -417,7 +642,7 @@ export default function AdminProductos() {
       )}
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ margin: 0, color: 'var(--color-text-main, #1A2413)', fontSize: '1.85rem', fontWeight: 800 }}>
             📋 Gestión de Inventario
@@ -426,61 +651,73 @@ export default function AdminProductos() {
             {inventario.length} productos registrados · {productosFiltrados.length} visibles en catálogo
           </p>
         </div>
-        <button
-          id="btn-nuevo-producto"
-          onClick={() => setModalProducto({ ...PRODUCTO_VACIO, _esNuevo: true })}
-          style={{
-            background: 'var(--color-primary, #1A2413)',
-            border: 'none', color: 'var(--color-bg, #FAF8F2)', padding: '0.75rem 1.5rem',
-            borderRadius: 'var(--radius-sm, 4px)', fontWeight: 700, cursor: 'pointer',
-            fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem',
-            boxShadow: 'var(--shadow-sm)',
-            transition: 'background-color 0.2s ease, transform 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--color-primary-hover, #29381E)';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'var(--color-primary, #1A2413)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-        >
-          ➕ Nuevo Producto
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            id="btn-sync-mongo"
+            onClick={sincronizarBackend}
+            style={{
+              background: 'var(--color-surface, #ffffff)',
+              border: '1px solid var(--color-border, #E2DDD0)',
+              color: 'var(--color-text-main, #1A2413)',
+              padding: '0.75rem 1.25rem',
+              borderRadius: 'var(--radius-sm, 4px)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+            }}
+          >
+            🔄 Sincronizar MongoDB
+          </button>
+          <button
+            id="btn-nuevo-producto"
+            onClick={() => setModalProducto({ ...PRODUCTO_VACIO, _esNuevo: true })}
+            style={{
+              background: 'var(--color-primary, #1A2413)',
+              border: 'none', color: 'var(--color-bg, #FAF8F2)', padding: '0.75rem 1.5rem',
+              borderRadius: 'var(--radius-sm, 4px)', fontWeight: 700, cursor: 'pointer',
+              fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem',
+              boxShadow: 'var(--shadow-sm)',
+              transition: 'background-color 0.2s ease, transform 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--color-primary-hover, #29381E)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--color-primary, #1A2413)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            ➕ Nuevo Producto
+          </button>
+        </div>
       </div>
 
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        <input
-          id="input-busqueda-admin"
-          type="search"
-          placeholder="🔍 Buscar por nombre, código o marca..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          style={{
-            flex: '1', minWidth: '220px',
-            background: '#ffffff', border: '1px solid var(--color-border, #E2DDD0)',
-            borderRadius: 'var(--radius-sm, 4px)', padding: '0.65rem 1rem', color: 'var(--color-text-main, #1A2413)',
-            fontSize: '0.9rem', outline: 'none',
-          }}
-        />
-        <select
-          id="select-filtro-categoria"
-          value={filtroCategoria}
-          onChange={(e) => setFiltroCategoria(e.target.value)}
-          style={{
-            background: '#ffffff', border: '1px solid var(--color-border, #E2DDD0)',
-            borderRadius: 'var(--radius-sm, 4px)', padding: '0.65rem 1rem', color: 'var(--color-text-main, #1A2413)',
-            fontSize: '0.9rem', outline: 'none', minWidth: '180px',
-          }}
-        >
-          <option value="">Todas las categorías</option>
-          {CATEGORIAS_SONIDO_VIVO.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-      </div>
+      {/* KPIs MongoDB */}
+      <AdminMongoKpis
+        metricas={metricasVisibles}
+        cargando={cargandoMetricas}
+        error={errorMetricas}
+        onReintentar={sincronizarBackend}
+      />
+
+      {/* Query Bar NoSQL */}
+      <MongoQueryBar
+        busqueda={busqueda}
+        onBusquedaChange={setBusqueda}
+        categoriaSeleccionada={filtroCategoria}
+        onCategoriaChange={setFiltroCategoria}
+        estadoSeleccionado={filtroEstado}
+        onEstadoChange={setFiltroEstado}
+        categorias={categoriasDisponibles}
+        totalResultados={productosFiltrados.length}
+        onLimpiar={() => {
+          setBusqueda('');
+          setFiltroCategoria('');
+          setFiltroEstado('');
+        }}
+      />
 
       {/* Tabla */}
       <div
@@ -512,7 +749,8 @@ export default function AdminProductos() {
                 </tr>
               ) : (
                 productosFiltrados.map((p) => {
-                  const critico = p.stock <= (p.stockCritico ?? 3);
+                  const stockNum = Number(p.stock) || 0;
+                  const critico = stockNum <= (p.stockCritico ?? 3);
                   return (
                     <tr
                       key={p.codigo}
@@ -558,19 +796,78 @@ export default function AdminProductos() {
                         {formatearPrecioCLP(p.precio)}
                       </td>
                       <td style={tdStyle}>
-                        <span style={{
-                          background: critico ? 'var(--color-danger-bg, #FDF0F0)' : 'var(--color-success-bg, #EEF4E6)',
-                          color: critico ? 'var(--color-danger, #A33A3A)' : 'var(--color-success, #4E632E)',
-                          border: `1px solid ${critico ? 'rgba(163, 58, 58, 0.25)' : 'rgba(78, 99, 46, 0.25)'}`,
-                          padding: '0.25rem 0.65rem', borderRadius: '20px',
-                          fontWeight: 700, fontSize: '0.85rem',
-                          display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-                        }}>
-                          {critico ? '⚠️ ' : ''}{p.stock}
-                        </span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <button
+                            type="button"
+                            data-testid={`btn-stock-dec-${p.codigo}`}
+                            aria-label={`Disminuir stock de ${p.nombre}`}
+                            onClick={() => handleAjustarStock(p, -1)}
+                            style={{
+                              border: '1px solid var(--color-border, #E2DDD0)',
+                              background: '#ffffff',
+                              borderRadius: '4px',
+                              width: '24px',
+                              height: '24px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                            }}
+                          >
+                            -
+                          </button>
+                          <span style={{
+                            background: critico ? 'var(--color-danger-bg, #FDF0F0)' : 'var(--color-success-bg, #EEF4E6)',
+                            color: critico ? 'var(--color-danger, #A33A3A)' : 'var(--color-success, #4E632E)',
+                            border: `1px solid ${critico ? 'rgba(163, 58, 58, 0.25)' : 'rgba(78, 99, 46, 0.25)'}`,
+                            padding: '0.25rem 0.65rem', borderRadius: '20px',
+                            fontWeight: 700, fontSize: '0.85rem',
+                            display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                            minWidth: '40px', justifyContent: 'center',
+                          }}>
+                            {critico ? '⚠️ ' : ''}{stockNum}
+                          </span>
+                          <button
+                            type="button"
+                            data-testid={`btn-stock-inc-${p.codigo}`}
+                            aria-label={`Aumentar stock de ${p.nombre}`}
+                            onClick={() => handleAjustarStock(p, 1)}
+                            style={{
+                              border: '1px solid var(--color-border, #E2DDD0)',
+                              background: '#ffffff',
+                              borderRadius: '4px',
+                              width: '24px',
+                              height: '24px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            data-testid={`btn-inspeccionar-${p.codigo}`}
+                            onClick={() => setProductoInspeccionado(p)}
+                            style={{
+                              background: 'var(--color-surface, #ffffff)', border: '1px solid var(--color-border, #E2DDD0)',
+                              color: 'var(--color-primary, #1A2413)', borderRadius: 'var(--radius-sm, 4px)', padding: '0.45rem 0.8rem',
+                              cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, transition: 'background-color 0.2s',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-surface-hover, #F3EFE3)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-surface, #ffffff)')}
+                          >
+                            🔍 BSON
+                          </button>
                           <button
                             id={`btn-editar-${p.codigo}`}
                             onClick={() => setModalProducto({ ...p })}
@@ -623,6 +920,14 @@ export default function AdminProductos() {
           onCerrar={() => setModalEliminar(null)}
         />
       )}
+
+      {/* Drawer BSON */}
+      <BsonDocumentDrawer
+        producto={productoInspeccionado}
+        abierto={Boolean(productoInspeccionado)}
+        onCerrar={() => setProductoInspeccionado(null)}
+        onAgregarResena={handleAgregarResena}
+      />
     </div>
   );
 }
