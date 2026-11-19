@@ -46,3 +46,7 @@ docs/entregables/
 
 # Archivos comprimidos de release
 *.zip
+
+# Copias temporales locales
+*-builchina.*
+**/*-builchina.*
