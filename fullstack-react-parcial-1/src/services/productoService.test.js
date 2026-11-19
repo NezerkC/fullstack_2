@@ -5,6 +5,10 @@ import {
   obtenerProductos,
   ajustarStock,
   actualizarEstado,
+  crearProducto,
+  actualizarProducto,
+  eliminarProducto,
+  agregarResena,
 } from './productoService';
 import { PRODUCTOS_SONIDO_VIVO } from '../data/productos';
 
@@ -125,6 +129,254 @@ describe('productoService', () => {
       })
     );
     expect(resultado).toEqual(mockRespuesta);
+  });
+
+  describe('crearProducto', () => {
+    test('invoca POST /api/v1/admin/products con DTO mapeado y Bearer token', async () => {
+      const nuevoProducto = {
+        codigo: 'MIC001',
+        nombre: 'Micrófono Dinámico Pro',
+        categoria: 'Microfonía',
+        precioClp: 89990,
+        stockDisponible: 12,
+        especificaciones: { patron: 'Cardioide' },
+        tags: ['audio', 'estudio'],
+      };
+
+      const dtoRespuesta = {
+        codigo: 'MIC001',
+        nombre: 'Micrófono Dinámico Pro',
+        categoria: 'Microfonía',
+        precioClp: 89990,
+        stockDisponible: 12,
+        estado: 'ACTIVO',
+      };
+      axios.post.mockResolvedValueOnce({ data: dtoRespuesta });
+
+      const resultado = await crearProducto(nuevoProducto, TOKEN);
+
+      expect(axios.post).toHaveBeenCalledTimes(1);
+      expect(axios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/admin/products'),
+        {
+          codigo: 'MIC001',
+          nombre: 'Micrófono Dinámico Pro',
+          categoria: 'Microfonía',
+          precioClp: 89990,
+          stockDisponible: 12,
+          especificaciones: { patron: 'Cardioide' },
+          tags: ['audio', 'estudio'],
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${TOKEN}`,
+          }),
+        })
+      );
+      expect(resultado).toMatchObject({
+        codigo: 'MIC001',
+        precio: 89990,
+        stock: 12,
+      });
+    });
+
+    test('relanza error si el status es 400 (Bad Request)', async () => {
+      const error400 = Object.assign(new Error('Bad Request'), {
+        response: { status: 400, data: { mensaje: 'Código duplicado' } },
+      });
+      axios.post.mockRejectedValueOnce(error400);
+
+      await expect(
+        crearProducto({ codigo: 'GA001', nombre: 'Duplicado' }, TOKEN)
+      ).rejects.toThrow('Bad Request');
+    });
+
+    test('retorna fallback mapeado ante Network Error sin lanzar', async () => {
+      axios.post.mockRejectedValueOnce(new Error('Network Error'));
+
+      const datos = {
+        codigo: 'FALLBACK01',
+        nombre: 'Fallback Producto',
+        categoria: 'Microfonía',
+        precioClp: 45000,
+        stockDisponible: 5,
+      };
+
+      const resultado = await crearProducto(datos, TOKEN);
+      expect(resultado).toMatchObject({
+        codigo: 'FALLBACK01',
+        nombre: 'Fallback Producto',
+        precio: 45000,
+        stock: 5,
+        estado: 'ACTIVO',
+      });
+    });
+  });
+
+  describe('actualizarProducto', () => {
+    test('invoca PUT /api/v1/admin/products/{codigo} con DTO mapeado y Bearer token', async () => {
+      const datosActualizar = {
+        nombre: 'Guitarra Acústica Custom',
+        categoria: 'Guitarras Acústicas',
+        precio_clp: 145000,
+        stock_disponible: 10,
+        tags: ['custom'],
+      };
+
+      const dtoRespuesta = {
+        codigo: 'GA001',
+        nombre: 'Guitarra Acústica Custom',
+        categoria: 'Guitarras Acústicas',
+        precioClp: 145000,
+        stockDisponible: 10,
+      };
+      axios.put.mockResolvedValueOnce({ data: dtoRespuesta });
+
+      const resultado = await actualizarProducto('GA001', datosActualizar, TOKEN);
+
+      expect(axios.put).toHaveBeenCalledTimes(1);
+      expect(axios.put).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/admin/products/GA001'),
+        {
+          nombre: 'Guitarra Acústica Custom',
+          categoria: 'Guitarras Acústicas',
+          precioClp: 145000,
+          stockDisponible: 10,
+          tags: ['custom'],
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${TOKEN}`,
+          }),
+        })
+      );
+      expect(resultado).toMatchObject({
+        codigo: 'GA001',
+        precio: 145000,
+        stock: 10,
+      });
+    });
+
+    test('retorna fallback mapeado ante error del servidor (>= 500)', async () => {
+      const error500 = Object.assign(new Error('Internal Server Error'), {
+        response: { status: 500 },
+      });
+      axios.put.mockRejectedValueOnce(error500);
+
+      const datos = {
+        nombre: 'Falla Servidor',
+        categoria: 'Audio',
+        precio: 20000,
+        stock: 2,
+      };
+
+      const resultado = await actualizarProducto('GA001', datos, TOKEN);
+      expect(resultado).toMatchObject({
+        codigo: 'GA001',
+        nombre: 'Falla Servidor',
+        precio: 20000,
+        stock: 2,
+      });
+    });
+  });
+
+  describe('eliminarProducto', () => {
+    test('invoca DELETE /api/v1/admin/products/{codigo} con Bearer token y retorna objeto de confirmación', async () => {
+      axios.delete.mockResolvedValueOnce({ status: 204 });
+
+      const resultado = await eliminarProducto('GA001', TOKEN);
+
+      expect(axios.delete).toHaveBeenCalledTimes(1);
+      expect(axios.delete).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/admin/products/GA001'),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${TOKEN}`,
+          }),
+        })
+      );
+      expect(resultado).toEqual({
+        codigo: 'GA001',
+        eliminado: true,
+        estado: 'DESCONTINUADO',
+      });
+    });
+
+    test('retorna objeto de confirmación ante Network Error (fallback offline)', async () => {
+      axios.delete.mockRejectedValueOnce(new Error('Network Error'));
+
+      const resultado = await eliminarProducto('GA001', TOKEN);
+      expect(resultado).toEqual({
+        codigo: 'GA001',
+        eliminado: true,
+        estado: 'DESCONTINUADO',
+      });
+    });
+  });
+
+  describe('agregarResena', () => {
+    test('invoca POST /api/v1/admin/products/{codigo}/reviews con ReviewCreateDTO y Bearer token', async () => {
+      const resena = {
+        cliente: 'Martina Gomez',
+        calificacion: 5,
+        comentario: 'Excelente sonido y acabado.',
+      };
+
+      const dtoRespuesta = {
+        codigo: 'GA001',
+        nombre: 'Guitarra Acústica Folk',
+        precio_clp: 129990,
+        stock_disponible: 8,
+        resenas: [
+          {
+            cliente: 'Martina Gomez',
+            calificacion: 5,
+            comentario: 'Excelente sonido y acabado.',
+            fecha: '2026-03-25',
+          },
+        ],
+      };
+      axios.post.mockResolvedValueOnce({ data: dtoRespuesta });
+
+      const resultado = await agregarResena('GA001', resena, TOKEN);
+
+      expect(axios.post).toHaveBeenCalledTimes(1);
+      expect(axios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/admin/products/GA001/reviews'),
+        {
+          cliente: 'Martina Gomez',
+          calificacion: 5,
+          comentario: 'Excelente sonido y acabado.',
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${TOKEN}`,
+          }),
+        })
+      );
+      expect(resultado.resenas).toHaveLength(1);
+      expect(resultado.resenas[0].cliente).toBe('Martina Gomez');
+    });
+
+    test('retorna fallback local ante Network Error agregando reseña con fecha actual', async () => {
+      axios.post.mockRejectedValueOnce(new Error('Network Error'));
+
+      const resena = {
+        cliente: 'Pedro Soto',
+        calificacion: 4,
+        comentario: 'Muy buen producto.',
+      };
+
+      const resultado = await agregarResena('GA001', resena, TOKEN);
+
+      expect(resultado).toBeDefined();
+      expect(resultado.codigo).toBe('GA001');
+      expect(Array.isArray(resultado.resenas)).toBe(true);
+      const resenaAgregada = resultado.resenas.find((r) => r.cliente === 'Pedro Soto');
+      expect(resenaAgregada).toBeDefined();
+      expect(resenaAgregada.calificacion).toBe(4);
+      expect(resenaAgregada.fecha).toBeDefined();
+    });
   });
 
   describe('fallback offline ante errores de red o servidor (>= 500)', () => {

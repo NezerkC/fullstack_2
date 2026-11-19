@@ -65,8 +65,8 @@ export function mapProductoDTO(dto) {
 
   return {
     ...dto,
-    precio: dto.precio_clp ?? dto.precio ?? 0,
-    stock: dto.stock_disponible ?? dto.stock ?? 0,
+    precio: dto.precio_clp ?? dto.precioClp ?? dto.precio ?? 0,
+    stock: dto.stock_disponible ?? dto.stockDisponible ?? dto.stock ?? 0,
   };
 }
 
@@ -162,6 +162,144 @@ export async function actualizarEstado(codigo, estado, token) {
   } catch (error) {
     if (isOfflineOrServerError(error)) {
       return { codigo, estado };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Crea un nuevo producto en el catálogo administrativo.
+ * @param {Record<string, any>} datos
+ * @param {string} [token]
+ * @returns {Promise<Record<string, any>>}
+ */
+export async function crearProducto(datos, token) {
+  const precioClp = Number(datos.precioClp ?? datos.precio_clp ?? datos.precio ?? 0);
+  const stockDisponible = Number(datos.stockDisponible ?? datos.stock_disponible ?? datos.stock ?? 0);
+
+  const payload = {
+    codigo: datos.codigo,
+    nombre: datos.nombre,
+    categoria: datos.categoria,
+    precioClp,
+    stockDisponible,
+    ...(datos.especificaciones ? { especificaciones: datos.especificaciones } : {}),
+    ...(datos.tags ? { tags: datos.tags } : {}),
+  };
+
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/v1/admin/products`, payload, {
+      headers: buildAuthHeaders(token),
+    });
+    return mapProductoDTO(response.data);
+  } catch (error) {
+    if (isOfflineOrServerError(error)) {
+      return mapProductoDTO({
+        ...datos,
+        precioClp,
+        stockDisponible,
+        estado: datos.estado || 'ACTIVO',
+      });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Actualiza la información de un producto existente.
+ * @param {string} codigo
+ * @param {Record<string, any>} datos
+ * @param {string} [token]
+ * @returns {Promise<Record<string, any>>}
+ */
+export async function actualizarProducto(codigo, datos, token) {
+  const precioClp = Number(datos.precioClp ?? datos.precio_clp ?? datos.precio ?? 0);
+  const stockDisponible = Number(datos.stockDisponible ?? datos.stock_disponible ?? datos.stock ?? 0);
+
+  const payload = {
+    nombre: datos.nombre,
+    categoria: datos.categoria,
+    precioClp,
+    stockDisponible,
+    ...(datos.especificaciones ? { especificaciones: datos.especificaciones } : {}),
+    ...(datos.tags ? { tags: datos.tags } : {}),
+  };
+
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/api/v1/admin/products/${encodeURIComponent(codigo)}`,
+      payload,
+      {
+        headers: buildAuthHeaders(token),
+      }
+    );
+    return mapProductoDTO(response.data);
+  } catch (error) {
+    if (isOfflineOrServerError(error)) {
+      return mapProductoDTO({
+        ...datos,
+        codigo,
+        precioClp,
+        stockDisponible,
+      });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Descontinúa o elimina un producto en el backend.
+ * @param {string} codigo
+ * @param {string} [token]
+ * @returns {Promise<{ codigo: string, eliminado: boolean, estado: string }>}
+ */
+export async function eliminarProducto(codigo, token) {
+  try {
+    await axios.delete(`${API_BASE_URL}/api/v1/admin/products/${encodeURIComponent(codigo)}`, {
+      headers: buildAuthHeaders(token),
+    });
+    return { codigo, eliminado: true, estado: 'DESCONTINUADO' };
+  } catch (error) {
+    if (isOfflineOrServerError(error)) {
+      return { codigo, eliminado: true, estado: 'DESCONTINUADO' };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Agrega una reseña embebida ($push) a un producto.
+ * @param {string} codigo
+ * @param {{ cliente: string, calificacion: number|string, comentario?: string }} resena
+ * @param {string} [token]
+ * @returns {Promise<Record<string, any>>}
+ */
+export async function agregarResena(codigo, resena, token) {
+  const payload = {
+    cliente: resena.cliente,
+    calificacion: Number(resena.calificacion),
+    comentario: resena.comentario ?? '',
+  };
+
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/v1/admin/products/${encodeURIComponent(codigo)}/reviews`,
+      payload,
+      {
+        headers: buildAuthHeaders(token),
+      }
+    );
+    return mapProductoDTO(response.data);
+  } catch (error) {
+    if (isOfflineOrServerError(error)) {
+      const local = PRODUCTOS_SONIDO_VIVO.find((item) => item.codigo === codigo);
+      return mapProductoDTO({
+        ...(local || { codigo }),
+        resenas: [
+          ...(local?.resenas || []),
+          { ...payload, fecha: new Date().toISOString().slice(0, 10) },
+        ],
+      });
     }
     throw error;
   }
