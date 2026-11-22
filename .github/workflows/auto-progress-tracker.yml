@@ -120,17 +120,136 @@ jobs:
                 title: 'Tarea 12 · Suite Integral de Pruebas Unitarias, Cobertura y Accesibilidad',
                 check: () => (fileExists('src/pages/Productos.test.jsx') || fileExists('src/pages/Carrito.test.jsx') || fileExists('src/pages/Registro.test.jsx')),
                 coachTip: 'Escribe pruebas de componentes con Testing Library para las páginas principales y valida accesibilidad con jest-axe hasta superar el 80% de cobertura.'
+              },
+              {
+                id: 13,
+                tag: 'Tarea 13',
+                title: 'Tarea 13 · Vistas de Categorías y Ofertas',
+                check: () => fileExists('src/pages/Categorias.jsx') && fileExists('src/pages/Ofertas.jsx'),
+                coachTip: 'Crea vistas especializadas de Categorias y Ofertas con grilla responsiva reutilizando ProductCard.'
+              },
+              {
+                id: 14,
+                tag: 'Tarea 14',
+                title: 'Tarea 14 · Checkout con datos de envío',
+                check: () => fileExists('src/pages/Checkout.jsx') && fileExists('src/components/checkout/ResumenPedido.jsx'),
+                coachTip: 'Implementa la vista Checkout con selectores dependientes de region/comuna y resumen tributario del pedido.'
+              },
+              {
+                id: 15,
+                tag: 'Tarea 15',
+                title: 'Tarea 15 · Vistas de compra exitosa y pago fallido',
+                check: () => fileExists('src/pages/CompraExitosa.jsx') && fileExists('src/pages/PagoFallido.jsx'),
+                coachTip: 'Crea las paginas de confirmacion y rechazo de transaccion con desglose de orden.'
+              },
+              {
+                id: 16,
+                tag: 'Tarea 16',
+                title: 'Tarea 16 · Mantenedor de usuarios con roles',
+                check: () => fileExists('src/pages/admin/AdminUsuarios.jsx') && fileContains('src/App.jsx', 'AdminUsuarios'),
+                coachTip: 'Desarrolla el mantenedor CRUD de cuentas de usuario con roles de Administrador, Vendedor y Cliente.'
+              },
+              {
+                id: 17,
+                tag: 'Tarea 17',
+                title: 'Tarea 17 · Pruebas de páginas institucionales y ficha de producto',
+                check: () => fileExists('src/pages/Nosotros.test.jsx') && fileExists('src/pages/Blogs.test.jsx') && fileExists('src/pages/ProductoDetalle.test.jsx'),
+                coachTip: 'Escribe suites de pruebas unitarias para vistas institucionales y detalle de producto.'
+              },
+              {
+                id: 18,
+                tag: 'Tarea 18',
+                title: 'Tarea 18 · Pruebas del panel administrativo',
+                check: () => fileExists('src/pages/admin/AdminProductos.test.jsx') && fileExists('src/pages/admin/AdminUsuarios.test.jsx'),
+                coachTip: 'Crea pruebas unitarias para flujos CRUD de productos y usuarios en el panel administrativo.'
+              },
+              {
+                id: 19,
+                tag: 'Tarea 19',
+                title: 'Tarea 19 · Validación de autenticación en Checkout y flujo de redirección',
+                check: () => fileContains('src/pages/Checkout.jsx', 'useAuth'),
+                coachTip: 'Conecta Checkout al estado de sesion para autocompletar datos del comprador y proteger el acceso.'
+              },
+              {
+                id: 20,
+                tag: 'Tarea 20',
+                title: 'Tarea 20 · Asociación de compras al historial del cliente y persistencia de órdenes',
+                check: () => fileContains('src/utils/checkout.js', 'sonido_vivo_ordenes') || fileContains('src/pages/Checkout.jsx', 'localStorage'),
+                coachTip: 'Persiste ordenes confirmadas en almacenamiento local con fecha, items, datos de entrega y total fiscal.'
+              },
+              {
+                id: 21,
+                tag: 'Tarea 21',
+                title: 'Tarea 21 · Pruebas unitarias para el flujo de autenticación y redirección en Checkout',
+                check: () => fileExists('src/pages/Checkout.test.jsx') && fs.existsSync(path.join(process.cwd(), 'Dockerfile')),
+                coachTip: 'Valida el flujo de compra y autenticacion en Checkout con pruebas unitarias y empaquetado Docker.'
+              },
+              {
+                id: 22,
+                tag: 'Tarea 22',
+                title: 'Tarea 22 · [FE-01] Adaptador HTTP y Cliente de Consultas NoSQL (productoService.js)',
+                check: () => fileExists('src/services/productoService.js') && fileExists('src/services/productoService.test.js'),
+                coachTip: 'Implementa productoService.js con JWT Bearer, mapeo DTO MongoDB, mutaciones atomicas y fallback offline.'
+              },
+              {
+                id: 23,
+                tag: 'Tarea 23',
+                title: 'Tarea 23 · [FE-02] Visualizador de Metricas de Agregacion MongoDB (AdminMongoKpis.jsx)',
+                check: () => fileExists('src/components/admin/AdminMongoKpis.jsx') && fileExists('src/components/admin/AdminMongoKpis.test.jsx'),
+                coachTip: 'Crea AdminMongoKpis.jsx con capital total en CLP, unidades/categorias activas y alerta de stock critico <= 3.'
+              },
+              {
+                id: 24,
+                tag: 'Tarea 24',
+                title: 'Tarea 24 · [FE-03] Query Builder de Filtros Polimorficos NoSQL (MongoQueryBar.jsx)',
+                check: () => fileExists('src/components/admin/MongoQueryBar.jsx') && fileExists('src/components/admin/MongoQueryBar.test.jsx'),
+                coachTip: 'Crea MongoQueryBar.jsx con busqueda full-text, chips de categorias, filtro por estado de documento y tests.'
+              },
+              {
+                id: 25,
+                tag: 'Tarea 25',
+                title: 'Tarea 25 · [FE-04] Inspector Lateral de Documento BSON & Reseñas (BsonDocumentDrawer.jsx)',
+                check: () => fileExists('src/components/admin/BsonDocumentDrawer.jsx') && fileExists('src/components/admin/BsonDocumentDrawer.test.jsx'),
+                coachTip: 'Implementa BsonDocumentDrawer.jsx para inspeccionar documentos BSON y gestionar resenas embebidas.'
+              },
+              {
+                id: 26,
+                tag: 'Tarea 26',
+                title: 'Tarea 26 · [FE-05] Integracion en AdminProductos y Suite de Pruebas de Regresion',
+                check: () => fileContains('src/pages/admin/AdminProductos.jsx', 'AdminMongoKpis') && fileContains('src/pages/admin/AdminProductos.jsx', 'MongoQueryBar') && fileContains('src/pages/admin/AdminProductos.jsx', 'BsonDocumentDrawer'),
+                coachTip: 'Integra AdminMongoKpis, MongoQueryBar y BsonDocumentDrawer en AdminProductos.jsx con tests de regresion.'
+              },
+              {
+                id: 27,
+                tag: 'Tarea 27',
+                title: 'Tarea 27 · [FE-06] Filtro Dinamico de Categorias y Busqueda en Catalogo Publico (Productos.jsx)',
+                check: () => fileContains('src/services/productoService.js', '/api/v1/public/products') && fileContains('src/pages/Productos.jsx', 'productoService'),
+                coachTip: 'Conecta src/pages/Productos.jsx a /api/v1/public/products con fallback offline, categorias dinamicas desde MongoDB y busqueda con debounce.'
+              },
+              {
+                id: 28,
+                tag: 'Tarea 28',
+                title: 'Tarea 28 · [FE-07] Confirmacion Visual y Simulacion de Pago en Checkout (Checkout.jsx)',
+                check: () => (fileContains('src/pages/Checkout.jsx', '/api/v1/store/sales') || fileContains('src/services/ventaService.js', '/api/v1/store/sales') || fileContains('src/services/productoService.js', '/api/v1/store/sales')) && (fileContains('src/pages/Checkout.jsx', 'WebPay') || fileContains('src/pages/Checkout.jsx', 'metodoPago')),
+                coachTip: 'Agrega seleccion de metodo de pago (WebPay/Transferencia), datos de facturacion, validacion previa de stock y envio POST /api/v1/store/sales en Checkout.jsx.'
+              },
+              {
+                id: 29,
+                tag: 'Tarea 29',
+                title: 'Tarea 29 · [FE-08] Modularizacion de Componentes para Extraccion de Landing Independiente',
+                check: () => fileExists('src/components/showcase/ProductShowcaseGrid.jsx') && fileExists('src/components/showcase/MiniCartDrawer.jsx'),
+                coachTip: 'Crea ProductShowcaseGrid.jsx y MiniCartDrawer.jsx desacoplados en src/components/showcase/ y documenta su integracion en README.md.'
               }
             ];
 
-            // Obtener issues actuales del repo
+            // Obtener issues actuales del repo (excluyendo Pull Requests)
             const issuesResp = await github.rest.issues.listForRepo({
               owner,
               repo,
               state: 'all',
               per_page: 100
             });
-            const issues = issuesResp.data;
+            const issues = issuesResp.data.filter(i => !i.pull_request);
 
             let firstPendingAssigned = false;
 

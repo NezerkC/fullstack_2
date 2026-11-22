@@ -190,54 +190,70 @@ $tasks = @(
         Tip = "Validar el flujo de compra simulado con pruebas unitarias y verificar el empaquetado OCI multi-stage."
     },
 
-    # --- UNIDAD 3: BACKEND API REST, PERSISTENCIA Y FULLSTACK INTEGRADO ---
+    # --- UNIDAD 3: FRONTEND OMNICANAL, MONGODB REST Y MODULARIZACION ---
     @{
         Id = 22
         Tag = "Tarea 22"
-        Title = "Arquitectura Base del Servidor Backend (API REST)"
-        Responsable = "NezerkC"
-        Check = { (Test-Path (Join-Path $PSScriptRoot "backend/package.json")) -or (Test-Path (Join-Path $PSScriptRoot "server/package.json")) -or (Test-Path (Join-Path $PSScriptRoot "backend/pom.xml")) }
-        Tip = "Inicializar el servicio backend con Express o Spring Boot y estructura de controladores, rutas y modelos."
+        Title = "[FE-01] Adaptador HTTP y Cliente NoSQL (productoService.js)"
+        Responsable = "dysandoval"
+        Check = { (Test-FileRel "src/services/productoService.js") -and (Test-FileRel "src/services/productoService.test.js") }
+        Tip = "Implementa productoService.js con JWT Bearer, mapeo DTO MongoDB, mutaciones atomicas y fallback offline con tests."
     },
     @{
         Id = 23
         Tag = "Tarea 23"
-        Title = "Persistencia en Base de Datos Relacional (PostgreSQL)"
+        Title = "[FE-02] Metricas de Agregacion MongoDB (AdminMongoKpis.jsx)"
         Responsable = "dysandoval"
-        Check = { (Test-Path (Join-Path $PSScriptRoot "backend/src/config/database.js")) -or (Test-Path (Join-Path $PSScriptRoot "backend/src/main/resources/application.properties")) }
-        Tip = "Configurar conexion a PostgreSQL (192.168.3.150:5432) y definir esquemas de tablas: usuarios, productos y ordenes."
+        Check = { (Test-FileRel "src/components/admin/AdminMongoKpis.jsx") -and (Test-FileRel "src/components/admin/AdminMongoKpis.test.jsx") }
+        Tip = "Crea AdminMongoKpis.jsx con capital total CLP, unidades/categorias activas, alerta de stock critico <= 3 y tests."
     },
     @{
         Id = 24
         Tag = "Tarea 24"
-        Title = "Endpoints de Autenticacion y Seguridad JWT en Backend"
-        Responsable = "NezerkC"
-        Check = { (Test-Path (Join-Path $PSScriptRoot "backend/src/routes/auth.js")) -or (Test-Path (Join-Path $PSScriptRoot "backend/src/controllers/auth.controller.js")) }
-        Tip = "Crear endpoints /api/auth/login y /api/auth/registro con hashing de contraseñas (bcrypt) y generacion de tokens JWT."
+        Title = "[FE-03] Query Builder Polimorfico NoSQL (MongoQueryBar.jsx)"
+        Responsable = "dysandoval"
+        Check = { (Test-FileRel "src/components/admin/MongoQueryBar.jsx") -and (Test-FileRel "src/components/admin/MongoQueryBar.test.jsx") }
+        Tip = "Crea MongoQueryBar.jsx con busqueda full-text, chips de categorias, filtro por estado de documento y tests."
     },
     @{
         Id = 25
         Tag = "Tarea 25"
-        Title = "Endpoints CRUD de Catalogo de Productos e Inventario"
-        Responsable = "Daakhen"
-        Check = { (Test-Path (Join-Path $PSScriptRoot "backend/src/routes/productos.js")) -or (Test-Path (Join-Path $PSScriptRoot "backend/src/controllers/productos.controller.js")) }
-        Tip = "Implementar endpoints GET /api/productos, POST, PUT y DELETE para conectar la base de datos real con el catálogo."
+        Title = "[FE-04] Inspector Lateral BSON & Resenas (BsonDocumentDrawer)"
+        Responsable = "NezerkC"
+        Check = { (Test-FileRel "src/components/admin/BsonDocumentDrawer.jsx") -and (Test-FileRel "src/components/admin/BsonDocumentDrawer.test.jsx") }
+        Tip = "Implementa BsonDocumentDrawer.jsx para inspeccionar documentos BSON y gestionar resenas embebidas."
     },
     @{
         Id = 26
         Tag = "Tarea 26"
-        Title = "Endpoints de Ordenes, Carrito y Despacho en Backend"
+        Title = "[FE-05] Integracion AdminProductos y Suite de Regresion"
         Responsable = "NezerkC"
-        Check = { (Test-Path (Join-Path $PSScriptRoot "backend/src/routes/ordenes.js")) -or (Test-Path (Join-Path $PSScriptRoot "backend/src/controllers/ordenes.controller.js")) }
-        Tip = "Implementar creación de órdenes con cálculo fiscal del IVA 19% y consulta de historial de pedidos por usuario."
+        Check = { (Test-ContentRel "src/pages/admin/AdminProductos.jsx" "AdminMongoKpis") -and (Test-ContentRel "src/pages/admin/AdminProductos.jsx" "MongoQueryBar") -and (Test-ContentRel "src/pages/admin/AdminProductos.jsx" "BsonDocumentDrawer") }
+        Tip = "Integra AdminMongoKpis, MongoQueryBar y BsonDocumentDrawer en AdminProductos.jsx con tests de regresion."
     },
     @{
         Id = 27
         Tag = "Tarea 27"
-        Title = "Integracion FullStack: Front React + Backend API + Docker Compose"
+        Title = "[FE-06] Filtro Dinamico y Busqueda Publica (Productos.jsx)"
+        Responsable = "Daakhen"
+        Check = { (Test-ContentRel "src/services/productoService.js" "/api/v1/public/products") -and (Test-ContentRel "src/pages/Productos.jsx" "productoService") }
+        Tip = "Conecta Productos.jsx a /api/v1/public/products con fallback offline, categorias dinamicas y busqueda con debounce."
+    },
+    @{
+        Id = 28
+        Tag = "Tarea 28"
+        Title = "[FE-07] Confirmacion Visual y Simulacion de Pago (Checkout)"
         Responsable = "NezerkC"
-        Check = { (Test-Path (Join-Path $PSScriptRoot "backend")) -and (Test-ContentRel "src/services/api.js" "process.env.VITE_API_URL") }
-        Tip = "Conectar el frontend React a los endpoints del backend y orquestar ambos servicios en docker-compose."
+        Check = { ((Test-ContentRel "src/pages/Checkout.jsx" "/api/v1/store/sales") -or (Test-ContentRel "src/services/ventaService.js" "/api/v1/store/sales") -or (Test-ContentRel "src/services/productoService.js" "/api/v1/store/sales")) -and ((Test-ContentRel "src/pages/Checkout.jsx" "WebPay") -or (Test-ContentRel "src/pages/Checkout.jsx" "metodoPago")) }
+        Tip = "Agrega seleccion de metodo de pago (WebPay/Transferencia), facturacion, validacion de stock y POST /api/v1/store/sales en Checkout.jsx."
+    },
+    @{
+        Id = 29
+        Tag = "Tarea 29"
+        Title = "[FE-08] Modularizacion Landing Independiente (showcase/)"
+        Responsable = "NezerkC"
+        Check = { (Test-FileRel "src/components/showcase/ProductShowcaseGrid.jsx") -and (Test-FileRel "src/components/showcase/MiniCartDrawer.jsx") }
+        Tip = "Desacopla ProductShowcaseGrid y MiniCartDrawer en src/components/showcase/ y documenta su integracion en README.md."
     }
 )
 
@@ -274,7 +290,7 @@ $percentage = [math]::Round(($completedCount / $totalTasks) * 100, 1)
 Write-Host ""
 Write-Host "================================================================================" -ForegroundColor Cyan
 Write-Host " SONIDO VIVO :: AUTOPILOT DE PROGRESO Y SEGUIMIENTO DE PROYECTO               " -ForegroundColor Cyan
-Write-Host " Repositorio: NezerkC/Prueba-Parcial-1 | DSY1104 FullStack II - Duoc UC         " -ForegroundColor DarkCyan
+Write-Host " Repositorio: NezerkC/fullstack_2 | DSY1104 FullStack II - Duoc UC             " -ForegroundColor DarkCyan
 Write-Host "================================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -304,7 +320,7 @@ Write-Host ""
 Write-Host "--------------------------------------------------------------------------------" -ForegroundColor DarkGray
 
 if ($firstPending) {
-    Write-Host " [!] QUE TOCA HACER AHORA (UNIDAD 3 - BACKEND):" -ForegroundColor Magenta
+    Write-Host " [!] QUE TOCA HACER AHORA (UNIDAD 3 - FRONTEND OMNICANAL):" -ForegroundColor Magenta
     Write-Host "     Tarea Activa: " -NoNewline -ForegroundColor White
     Write-Host "$($firstPending.Tag) - $($firstPending.Title)" -ForegroundColor Yellow
     Write-Host "     Asignado a:   " -NoNewline -ForegroundColor White
@@ -312,7 +328,7 @@ if ($firstPending) {
     Write-Host "     Instruccion:  " -NoNewline -ForegroundColor White
     Write-Host "$($firstPending.Tip)" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "     Para avanzar en el chat, solo di: 'avancemos' o 'iniciar backend'." -ForegroundColor DarkYellow
+    Write-Host "     Para avanzar en el chat, solo di: 'avancemos'." -ForegroundColor DarkYellow
 } else {
     Write-Host " [V] FELICITACIONES: Todas las tareas estan completadas al 100%!" -ForegroundColor Green
 }
