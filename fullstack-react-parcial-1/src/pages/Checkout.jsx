@@ -1,11 +1,19 @@
 import { useState } from 'react';
-import { Col, Form, Row } from 'react-bootstrap';
+import { Alert, Col, Form, Row, Spinner } from 'react-bootstrap';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import ResumenPedido from '../components/checkout/ResumenPedido';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { REGIONES_CHILE } from '../data/regiones';
-import { TIPOS_ENTREGA, crearOrden, guardarOrdenStorage, validarDatosEnvio } from '../utils/checkout';
+import {
+  TIPOS_ENTREGA,
+  METODOS_PAGO,
+  TIPOS_DOCUMENTO,
+  crearOrden,
+  guardarOrdenStorage,
+  validarDatosEnvio,
+} from '../utils/checkout';
+import { registrarVenta, validarStockPrevio } from '../services/ventaService';
 
 // Si hay sesión iniciada, los datos del cliente se completan automáticamente
 function datosIniciales(usuario) {
@@ -18,6 +26,10 @@ function datosIniciales(usuario) {
     departamento: '',
     region: usuario?.region || '',
     comuna: usuario?.comuna || '',
+    metodoPago: METODOS_PAGO.WEBPAY,
+    tipoDocumento: TIPOS_DOCUMENTO.BOLETA,
+    rutFacturacion: usuario?.rut || '',
+    razonSocial: '',
     simularRechazo: false,
   };
 }
@@ -29,6 +41,8 @@ function Checkout() {
 
   const [datos, setDatos] = useState(() => datosIniciales(usuario));
   const [errores, setErrores] = useState({});
+  const [errorStock, setErrorStock] = useState(null);
+  const [procesando, setProcesando] = useState(false);
   // evita que, al vaciar el carrito tras pagar, se redirija al carrito en vez del comprobante
   const [compraConfirmada, setCompraConfirmada] = useState(false);
 
@@ -44,6 +58,7 @@ function Checkout() {
 
   const comunas = REGIONES_CHILE.find((r) => r.id === datos.region)?.comunas || [];
   const esDomicilio = datos.tipoEntrega === TIPOS_ENTREGA.DOMICILIO;
+  const esFactura = datos.tipoDocumento === TIPOS_DOCUMENTO.FACTURA;
 
   const handleChange = (evento) => {
     const { name, value, type, checked } = evento.target;
@@ -56,27 +71,46 @@ function Checkout() {
     if (errores[name]) setErrores((anteriores) => ({ ...anteriores, [name]: undefined }));
   };
 
-  const handleSubmit = (evento) => {
+  const handleSubmit = async (evento) => {
     evento.preventDefault();
+    setErrorStock(null);
+
     const nuevosErrores = validarDatosEnvio(datos);
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
       return;
     }
 
+    // Validación de stock antes de proceder al pago
+    const { valido, faltantes } = validarStockPrevio(items);
+    if (!valido) {
+      setErrorStock(faltantes);
+      return;
+    }
+
     const orden = crearOrden({ datos, items, subtotal, iva, total: totalConIva, usuario });
 
-    // Pago simulado: no hay pasarela real en esta etapa del proyecto
+    // Pago simulado: rechazo solicitado
     if (datos.simularRechazo) {
       navigate('/pago-fallido', { state: { orden } });
       return;
     }
 
-    // Tarea 20: Persistir orden asociada al historial de órdenes del cliente
-    guardarOrdenStorage(orden);
-    setCompraConfirmada(true);
-    clearCart();
-    navigate('/compra-exitosa', { state: { orden } });
+    setProcesando(true);
+    try {
+      const ordenConfirmada = await registrarVenta(orden);
+      setCompraConfirmada(true);
+      clearCart();
+      navigate('/compra-exitosa', { state: { orden: ordenConfirmada } });
+    } catch {
+      // Fallback local o error al registrar
+      guardarOrdenStorage(orden);
+      setCompraConfirmada(true);
+      clearCart();
+      navigate('/compra-exitosa', { state: { orden } });
+    } finally {
+      setProcesando(false);
+    }
   };
 
   return (
@@ -89,6 +123,22 @@ function Checkout() {
             : 'Ingresa tus datos y la dirección de entrega para completar la compra.'}
         </p>
       </header>
+
+      {errorStock && errorStock.length > 0 && (
+        <Alert variant="danger" role="alert" data-testid="checkout-stock-error" className="mb-4">
+          <Alert.Heading className="h6 fw-bold">Stock insuficiente para completar la orden</Alert.Heading>
+          <p className="mb-2 small">
+            Los siguientes artículos no cuentan con la cantidad solicitada en bodega:
+          </p>
+          <ul className="mb-0 small">
+            {errorStock.map((item) => (
+              <li key={item.codigo}>
+                <strong>{item.nombre}</strong> (Cód: {item.codigo}): solicitaste {item.solicitado} unidad(es), disponible en bodega: {item.disponible}.
+              </li>
+            ))}
+          </ul>
+        </Alert>
+      )}
 
       <Row className="g-4">
         <Col lg={7}>
@@ -224,6 +274,91 @@ function Checkout() {
               </Row>
             )}
 
+            <h2 className="h5 fw-bold mt-4 mb-3">Método de pago y facturación</h2>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold small text-muted d-block">Medio de pago</Form.Label>
+              <Form.Check
+                type="radio"
+                id="pago-webpay"
+                name="metodoPago"
+                value={METODOS_PAGO.WEBPAY}
+                label="WebPay Plus (Tarjetas de Débito y Crédito)"
+                checked={datos.metodoPago === METODOS_PAGO.WEBPAY}
+                onChange={handleChange}
+              />
+              <Form.Check
+                type="radio"
+                id="pago-transferencia"
+                name="metodoPago"
+                value={METODOS_PAGO.TRANSFERENCIA}
+                label="Transferencia Bancaria directa"
+                checked={datos.metodoPago === METODOS_PAGO.TRANSFERENCIA}
+                onChange={handleChange}
+              />
+              {errores.metodoPago && (
+                <div className="text-danger small mt-1">{errores.metodoPago}</div>
+              )}
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold small text-muted d-block">Tipo de documento tributario</Form.Label>
+              <div className="d-flex gap-4">
+                <Form.Check
+                  type="radio"
+                  id="doc-boleta"
+                  name="tipoDocumento"
+                  value={TIPOS_DOCUMENTO.BOLETA}
+                  label="Boleta Electrónica"
+                  checked={datos.tipoDocumento === TIPOS_DOCUMENTO.BOLETA}
+                  onChange={handleChange}
+                />
+                <Form.Check
+                  type="radio"
+                  id="doc-factura"
+                  name="tipoDocumento"
+                  value={TIPOS_DOCUMENTO.FACTURA}
+                  label="Factura Electrónica"
+                  checked={esFactura}
+                  onChange={handleChange}
+                />
+              </div>
+            </Form.Group>
+
+            {esFactura && (
+              <Row className="g-3 p-3 mb-3 bg-white rounded border" data-testid="checkout-factura-fields">
+                <Col md={6}>
+                  <Form.Group controlId="checkout-rut-facturacion">
+                    <Form.Label>RUT Empresa</Form.Label>
+                    <Form.Control
+                      name="rutFacturacion"
+                      placeholder="Ej: 76.123.456-7"
+                      value={datos.rutFacturacion}
+                      onChange={handleChange}
+                      isInvalid={Boolean(errores.rutFacturacion)}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      {errores.rutFacturacion}
+                    </Form.Control.Feedback>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group controlId="checkout-razon-social">
+                    <Form.Label>Razón Social</Form.Label>
+                    <Form.Control
+                      name="razonSocial"
+                      placeholder="Ej: Servicios Musicales SpA"
+                      value={datos.razonSocial}
+                      onChange={handleChange}
+                      isInvalid={Boolean(errores.razonSocial)}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      {errores.razonSocial}
+                    </Form.Control.Feedback>
+                  </Form.Group>
+                </Col>
+              </Row>
+            )}
+
             <div className="mt-4 p-3 bg-light rounded border">
               <Form.Check
                 type="checkbox"
@@ -243,8 +378,16 @@ function Checkout() {
                 type="submit"
                 className="btn btn-primary px-4 py-2"
                 data-testid="btn-confirmar-pago"
+                disabled={procesando}
               >
-                Pagar y confirmar
+                {procesando ? (
+                  <>
+                    <Spinner size="sm" animation="border" className="me-2" />
+                    Procesando pago...
+                  </>
+                ) : (
+                  'Pagar y confirmar'
+                )}
               </button>
             </div>
           </Form>

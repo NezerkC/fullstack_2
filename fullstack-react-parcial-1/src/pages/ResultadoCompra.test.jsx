@@ -8,6 +8,12 @@ const ORDEN = {
   numero: 'SV-654321',
   cliente: { nombre: 'Danilo', apellidos: 'Sepúlveda', correo: 'danilo@duoc.cl' },
   entrega: { tipo: 'retiro', direccion: '', departamento: '', region: '', comuna: '' },
+  pago: {
+    metodo: 'Transferencia',
+    tipoDocumento: 'factura',
+    rutFacturacion: '76.123.456-7',
+    razonSocial: 'Música SpA',
+  },
   items: [{ codigo: 'AC001', nombre: 'Cable Plug', precio: 10000, cantidad: 2 }],
   subtotal: 20000,
   iva: 3800,
@@ -32,6 +38,10 @@ describe('Vistas de resultado de la compra', () => {
 
     expect(screen.getByTestId('numero-orden')).toHaveTextContent('SV-654321');
     expect(screen.getByTestId('entrega-descripcion')).toHaveTextContent(/Retiro en tienda/i);
+    expect(screen.getByTestId('comprobante-metodo-pago')).toHaveTextContent('Transferencia');
+    expect(screen.getByTestId('comprobante-tipo-documento')).toHaveTextContent('Factura Electrónica');
+    expect(screen.getByTestId('comprobante-rut-facturacion')).toHaveTextContent('76.123.456-7');
+    expect(screen.getByTestId('comprobante-razon-social')).toHaveTextContent('Música SpA');
     expect(screen.getByTestId('resumen-total')).toHaveTextContent('$23.800');
   });
 

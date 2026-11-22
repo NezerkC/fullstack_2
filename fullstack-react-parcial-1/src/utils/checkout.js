@@ -1,9 +1,21 @@
 // Reglas del checkout: validación de datos de envío y creación de la orden.
 // Son funciones puras para poder probarlas sin renderizar componentes.
 
+import { validarRutChileno } from './validaciones';
+
 export const TIPOS_ENTREGA = {
   DOMICILIO: 'domicilio',
   RETIRO: 'retiro',
+};
+
+export const METODOS_PAGO = {
+  WEBPAY: 'WebPay',
+  TRANSFERENCIA: 'Transferencia',
+};
+
+export const TIPOS_DOCUMENTO = {
+  BOLETA: 'boleta',
+  FACTURA: 'factura',
 };
 
 export const ORDENES_STORAGE_KEY = 'sonido_vivo_ordenes_v1';
@@ -25,6 +37,24 @@ export function validarDatosEnvio(datos = {}) {
     if (!(datos.direccion || '').trim()) errores.direccion = 'La dirección es obligatoria.';
     if (!datos.region) errores.region = 'Selecciona una región.';
     if (!datos.comuna) errores.comuna = 'Selecciona una comuna.';
+  }
+
+  // Validación de método de pago si se suministra
+  if (datos.metodoPago && !Object.values(METODOS_PAGO).includes(datos.metodoPago)) {
+    errores.metodoPago = 'Método de pago inválido.';
+  }
+
+  // Validación de facturación si tipoDocumento es factura
+  if (datos.tipoDocumento === TIPOS_DOCUMENTO.FACTURA) {
+    const rutFact = (datos.rutFacturacion || '').trim();
+    const razonSocial = (datos.razonSocial || '').trim();
+
+    if (!rutFact || !validarRutChileno(rutFact)) {
+      errores.rutFacturacion = 'RUT de facturación inválido o requerido.';
+    }
+    if (!razonSocial) {
+      errores.razonSocial = 'Razón social requerida para factura.';
+    }
   }
 
   return errores;
@@ -61,6 +91,12 @@ export function crearOrden({ datos, items, subtotal, iva, total, usuario = null,
       departamento: datos.departamento || '',
       region: datos.region || '',
       comuna: datos.comuna || '',
+    },
+    pago: {
+      metodo: datos.metodoPago || METODOS_PAGO.WEBPAY,
+      tipoDocumento: datos.tipoDocumento || TIPOS_DOCUMENTO.BOLETA,
+      rutFacturacion: (datos.rutFacturacion || '').trim(),
+      razonSocial: (datos.razonSocial || '').trim(),
     },
     items: items.map(({ codigo, nombre, precio, cantidad }) => ({ codigo, nombre, precio, cantidad })),
     subtotal,

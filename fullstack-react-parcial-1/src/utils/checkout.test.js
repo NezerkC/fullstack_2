@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   TIPOS_ENTREGA,
+  METODOS_PAGO,
+  TIPOS_DOCUMENTO,
   ORDENES_STORAGE_KEY,
   crearOrden,
   generarNumeroOrden,
@@ -18,6 +20,8 @@ const DATOS_VALIDOS = {
   departamento: '',
   region: 'V',
   comuna: 'Viña del Mar',
+  metodoPago: METODOS_PAGO.WEBPAY,
+  tipoDocumento: TIPOS_DOCUMENTO.BOLETA,
 };
 
 describe('Reglas del checkout', () => {
@@ -53,6 +57,38 @@ describe('Reglas del checkout', () => {
     expect(orden.entrega.comuna).toBe('Viña del Mar');
     expect(orden.items).toEqual([{ codigo: 'GE001', nombre: 'Guitarra', precio: 1000, cantidad: 2 }]);
     expect(orden.total).toBe(2380);
+    expect(orden.pago).toBeDefined();
+    expect(orden.pago.metodo).toBe(METODOS_PAGO.WEBPAY);
+    expect(orden.pago.tipoDocumento).toBe(TIPOS_DOCUMENTO.BOLETA);
+  });
+
+  it('valida datos de facturación cuando el tipo de documento es factura', () => {
+    const datosFacturaInvalida = {
+      ...DATOS_VALIDOS,
+      tipoDocumento: TIPOS_DOCUMENTO.FACTURA,
+      rutFacturacion: '11111111-2', // RUT inválido
+      razonSocial: '',
+    };
+    const errores = validarDatosEnvio(datosFacturaInvalida);
+    expect(errores.rutFacturacion).toBeDefined();
+    expect(errores.razonSocial).toBeDefined();
+
+    const datosFacturaValida = {
+      ...DATOS_VALIDOS,
+      tipoDocumento: TIPOS_DOCUMENTO.FACTURA,
+      rutFacturacion: '19.011.029-K',
+      razonSocial: 'Acme SpA',
+    };
+    expect(validarDatosEnvio(datosFacturaValida)).toEqual({});
+  });
+
+  it('valida que el método de pago pertenezca a METODOS_PAGO', () => {
+    const datosMetodoInvalido = {
+      ...DATOS_VALIDOS,
+      metodoPago: 'Criptomoneda',
+    };
+    const errores = validarDatosEnvio(datosMetodoInvalido);
+    expect(errores.metodoPago).toBeDefined();
   });
 
   it('asocia la orden al usuario autenticado (RUT y correo)', () => {

@@ -46,6 +46,35 @@ function CompraExitosa() {
               {describirEntrega(orden.entrega)}
             </p>
           </section>
+
+          {orden.pago && (
+            <section className="form-card mt-3" aria-label="Detalles del pago">
+              <h2 className="h5 fw-bold mb-3">Pago y Facturación</h2>
+              <p className="mb-1">
+                <strong>Método:</strong>{' '}
+                <span data-testid="comprobante-metodo-pago">{orden.pago.metodo || 'WebPay'}</span>
+              </p>
+              <p className="mb-1">
+                <strong>Documento:</strong>{' '}
+                <span data-testid="comprobante-tipo-documento">
+                  {orden.pago.tipoDocumento === 'factura' ? 'Factura Electrónica' : 'Boleta Electrónica'}
+                </span>
+              </p>
+              {orden.pago.tipoDocumento === 'factura' && (
+                <>
+                  <p className="mb-1">
+                    <strong>RUT Facturación:</strong>{' '}
+                    <span data-testid="comprobante-rut-facturacion">{orden.pago.rutFacturacion}</span>
+                  </p>
+                  <p className="mb-1">
+                    <strong>Razón Social:</strong>{' '}
+                    <span data-testid="comprobante-razon-social">{orden.pago.razonSocial}</span>
+                  </p>
+                </>
+              )}
+            </section>
+          )}
+
           <Link to="/productos" className="btn btn-primary mt-3">
             Seguir Comprando
           </Link>

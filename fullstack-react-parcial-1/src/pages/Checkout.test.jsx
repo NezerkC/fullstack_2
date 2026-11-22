@@ -139,7 +139,7 @@ describe('<Checkout />', () => {
     await completarDatosValidos(user);
     await user.click(screen.getByTestId('btn-confirmar-pago'));
 
-    expect(screen.getByTestId('compra-exitosa')).toBeInTheDocument();
+    expect(await screen.findByTestId('compra-exitosa')).toBeInTheDocument();
     expect(screen.getByTestId('numero-orden')).toHaveTextContent(/^SV-\d{6}$/);
     expect(screen.getByTestId('entrega-descripcion')).toHaveTextContent(
       'Av. Libertad 1234, Viña del Mar, Valparaíso'
@@ -166,5 +166,46 @@ describe('<Checkout />', () => {
     expect(screen.getByTestId('pago-fallido')).toBeInTheDocument();
     expect(screen.getByTestId('btn-reintentar-pago')).toHaveAttribute('href', '/checkout');
     expect(JSON.parse(localStorage.getItem(CLAVE_CARRITO))).toHaveLength(1);
+  });
+
+  it('permite seleccionar factura y valida campos tributarios obligatorios', async () => {
+    const user = userEvent.setup();
+    renderCheckout();
+
+    await completarDatosValidos(user);
+    await user.click(screen.getByLabelText('Factura Electrónica'));
+
+    expect(screen.getByTestId('checkout-factura-fields')).toBeInTheDocument();
+
+    // Intentar pagar sin RUT ni Razón Social
+    await user.clear(screen.getByLabelText('RUT Empresa'));
+    await user.click(screen.getByTestId('btn-confirmar-pago'));
+    expect(screen.getByText(/Razón social requerida/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('RUT Empresa'), '19.011.029-K');
+    await user.type(screen.getByLabelText('Razón Social'), 'Sonido Pro SpA');
+
+    await user.click(screen.getByTestId('btn-confirmar-pago'));
+
+    expect(await screen.findByTestId('compra-exitosa')).toBeInTheDocument();
+    expect(screen.getByTestId('comprobante-tipo-documento')).toHaveTextContent('Factura Electrónica');
+  });
+
+  it('bloquea la orden y muestra alerta si no hay stock suficiente en catálogo', async () => {
+    // Carrito con cantidad que supera el stock disponible
+    const carritoSinStock = [
+      { codigo: 'GA001', nombre: 'Guitarra Acústica Folk', precio: 129990, cantidad: 999 },
+    ];
+    localStorage.setItem(CLAVE_CARRITO, JSON.stringify(carritoSinStock));
+
+    const user = userEvent.setup();
+    renderCheckout();
+
+    await completarDatosValidos(user);
+    await user.click(screen.getByTestId('btn-confirmar-pago'));
+
+    expect(screen.getByTestId('checkout-stock-error')).toBeInTheDocument();
+    expect(screen.getByText(/Stock insuficiente/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('compra-exitosa')).not.toBeInTheDocument();
   });
 });
