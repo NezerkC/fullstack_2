@@ -3,6 +3,8 @@ import axios from 'axios';
 import {
   obtenerMetricas,
   obtenerProductos,
+  obtenerProductosPublicos,
+  extraerCategoriasUnicas,
   ajustarStock,
   actualizarEstado,
   crearProducto,
@@ -404,6 +406,104 @@ describe('productoService', () => {
 
       expect(metricas).toBeDefined();
       expect(typeof metricas).toBe('object');
+    });
+  });
+
+  describe('extraerCategoriasUnicas y obtenerProductosPublicos (Catálogo Público)', () => {
+    test('extraerCategoriasUnicas extrae categorías sin duplicados, ignorando vacíos y ordenadas con localeCompare es', () => {
+      const productos = [
+        { categoria: 'Teclados y Pianos' },
+        { categoria: 'Guitarras Eléctricas' },
+        { categoria: '   ' },
+        { categoria: null },
+        { categoria: 'Bajos Eléctricos' },
+        { categoria: 'Guitarras Eléctricas' },
+        { categoria: 'Álbumes y Partituras' },
+      ];
+
+      const resultado = extraerCategoriasUnicas(productos);
+      expect(resultado).toEqual([
+        'Álbumes y Partituras',
+        'Bajos Eléctricos',
+        'Guitarras Eléctricas',
+        'Teclados y Pianos',
+      ]);
+    });
+
+    test('extraerCategoriasUnicas maneja arreglos vacíos o entradas no válidas', () => {
+      expect(extraerCategoriasUnicas([])).toEqual([]);
+      expect(extraerCategoriasUnicas(null)).toEqual([]);
+      expect(extraerCategoriasUnicas(undefined)).toEqual([]);
+    });
+
+    test('obtenerProductosPublicos(params) invoca GET /api/v1/public/products sin auth header y mapea DTOs', async () => {
+      const params = { categoria: 'Baterías', q: 'pearl' };
+      const apiResponse = {
+        productos: [
+          {
+            codigo: 'BAT001',
+            nombre: 'Batería Pearl Export',
+            categoria: 'Baterías',
+            precio_clp: 799990,
+            stock_disponible: 3,
+          },
+        ],
+      };
+      axios.get.mockResolvedValueOnce({ data: apiResponse });
+
+      const productos = await obtenerProductosPublicos(params);
+
+      expect(axios.get).toHaveBeenCalledTimes(1);
+      expect(axios.get).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/public/products'),
+        { params }
+      );
+      expect(productos).toHaveLength(1);
+      expect(productos[0]).toMatchObject({
+        codigo: 'BAT001',
+        precio: 799990,
+        stock: 3,
+      });
+    });
+
+    test('obtenerProductosPublicos maneja fallback offline filtrando por categoria y q', async () => {
+      axios.get.mockRejectedValueOnce(new Error('Network Error'));
+
+      const productos = await obtenerProductosPublicos({
+        categoria: 'Guitarras Acústicas',
+        q: 'yamaha',
+      });
+
+      expect(Array.isArray(productos)).toBe(true);
+      expect(productos.length).toBeGreaterThan(0);
+      expect(
+        productos.every(
+          (p) =>
+            p.categoria === 'Guitarras Acústicas' &&
+            `${p.nombre} ${p.marca} ${p.modelo} ${p.codigo} ${p.categoria} ${p.descripcion}`
+              .toLowerCase()
+              .includes('yamaha')
+        )
+      ).toBe(true);
+    });
+
+    test('obtenerProductosPublicos maneja fallback offline sin filtros retornando todo el catálogo activo', async () => {
+      axios.get.mockRejectedValueOnce({ response: { status: 503 } });
+
+      const productos = await obtenerProductosPublicos();
+
+      expect(Array.isArray(productos)).toBe(true);
+      expect(productos.length).toBeGreaterThan(0);
+      expect(productos[0].precio).toBeDefined();
+    });
+
+    test('obtenerProductosPublicos relanza el error si no es error de red o de servidor (e.g. 400)', async () => {
+      const clientError = Object.assign(new Error('Bad Request'), {
+        response: { status: 400 },
+      });
+      axios.get.mockRejectedValueOnce(clientError);
+
+      await expect(obtenerProductosPublicos()).rejects.toThrow('Bad Request');
     });
   });
 });

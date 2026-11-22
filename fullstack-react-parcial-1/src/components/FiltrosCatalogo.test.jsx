@@ -68,4 +68,19 @@ describe('<FiltrosCatalogo />', () => {
 
     expect(onCategoriaChange).toHaveBeenCalledWith('Guitarras Acústicas');
   });
+
+  it('renderiza chips dinámicos si se pasa la prop categorias y mantiene chips por defecto si no', () => {
+    const categoriasPersonalizadas = ['Sintetizadores', 'Microfonía Pro'];
+    const { rerender } = render(
+      <FiltrosCatalogo {...defaultProps} categorias={categoriasPersonalizadas} />
+    );
+
+    expect(screen.getByTestId('chip-sintetizadores')).toBeInTheDocument();
+    expect(screen.getByTestId('chip-microfonía-pro')).toBeInTheDocument();
+    expect(screen.queryByTestId('chip-bajos-eléctricos')).not.toBeInTheDocument();
+
+    // Rerender sin prop categorias debe usar CATEGORIAS_SONIDO_VIVO
+    rerender(<FiltrosCatalogo {...defaultProps} categorias={[]} />);
+    expect(screen.getByTestId('chip-bajos-eléctricos')).toBeInTheDocument();
+  });
 });

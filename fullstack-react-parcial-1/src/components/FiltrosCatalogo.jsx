@@ -10,7 +10,11 @@ function FiltrosCatalogo({
   orden,
   onOrdenChange,
   totalResultados,
+  categorias,
 }) {
+  const listaCategorias =
+    categorias && categorias.length > 0 ? categorias : CATEGORIAS_SONIDO_VIVO;
+
   return (
     <section className="filtros-catalogo mb-4" aria-label="Filtros del catálogo">
       <div className="row g-3 align-items-center mb-3">
@@ -71,7 +75,7 @@ function FiltrosCatalogo({
         >
           Todas
         </Button>
-        {CATEGORIAS_SONIDO_VIVO.map((cat) => (
+        {listaCategorias.map((cat) => (
           <Button
             key={cat}
             variant={categoriaSeleccionada === cat ? 'primary' : 'outline-secondary'}
@@ -116,6 +120,7 @@ FiltrosCatalogo.propTypes = {
   orden: PropTypes.string.isRequired,
   onOrdenChange: PropTypes.func.isRequired,
   totalResultados: PropTypes.number.isRequired,
+  categorias: PropTypes.arrayOf(PropTypes.string),
 };
 
 export default FiltrosCatalogo;

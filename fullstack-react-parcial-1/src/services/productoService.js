@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { PRODUCTOS_SONIDO_VIVO } from '../data/productos';
+import { PRODUCTOS_SONIDO_VIVO, obtenerCatalogoActivo } from '../data/productos';
 
 const API_BASE_URL = import.meta.env?.VITE_API_URL || '';
 
@@ -68,6 +68,69 @@ export function mapProductoDTO(dto) {
     precio: dto.precio_clp ?? dto.precioClp ?? dto.precio ?? 0,
     stock: dto.stock_disponible ?? dto.stockDisponible ?? dto.stock ?? 0,
   };
+}
+
+/**
+ * Extrae la lista única de categorías ordenadas alfabéticamente a partir de un arreglo de productos.
+ * @param {Array<Record<string, any>>} [productos=[]]
+ * @returns {Array<string>}
+ */
+export function extraerCategoriasUnicas(productos = []) {
+  if (!Array.isArray(productos)) {
+    return [];
+  }
+
+  const setCategorias = new Set();
+  for (const prod of productos) {
+    if (typeof prod?.categoria === 'string') {
+      const limpia = prod.categoria.trim();
+      if (limpia.length > 0) {
+        setCategorias.add(limpia);
+      }
+    }
+  }
+
+  return Array.from(setCategorias).sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+/**
+ * Obtiene el catálogo público de productos con normalización DTO y fallback offline/error.
+ * @param {Record<string, any>} [params={}]
+ * @returns {Promise<Array<Record<string, any>>>}
+ */
+export async function obtenerProductosPublicos(params = {}) {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/v1/public/products`, {
+      params,
+    });
+    const rawList = Array.isArray(response.data)
+      ? response.data
+      : response.data?.content || response.data?.productos || [];
+    return rawList.map(mapProductoDTO);
+  } catch (error) {
+    if (isOfflineOrServerError(error)) {
+      let fallbackList = obtenerCatalogoActivo();
+
+      const categoria = params?.categoria;
+      if (categoria && categoria !== 'Todas') {
+        const catNormalizada = categoria.trim().toLowerCase();
+        fallbackList = fallbackList.filter(
+          (item) => (item.categoria || '').trim().toLowerCase() === catNormalizada
+        );
+      }
+
+      const q = typeof params?.q === 'string' ? params.q.trim().toLowerCase() : '';
+      if (q) {
+        fallbackList = fallbackList.filter((item) => {
+          const texto = `${item.nombre || ''} ${item.marca || ''} ${item.modelo || ''} ${item.codigo || ''} ${item.categoria || ''} ${item.descripcion || ''}`.toLowerCase();
+          return texto.includes(q);
+        });
+      }
+
+      return fallbackList.map(mapProductoDTO);
+    }
+    throw error;
+  }
 }
 
 /**

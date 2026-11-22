@@ -1,17 +1,59 @@
-import { useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
+import { useEffect, useMemo, useState } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
 import FiltrosCatalogo from '../components/FiltrosCatalogo';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
 import { obtenerCatalogoActivo } from '../data/productos';
+import { extraerCategoriasUnicas, obtenerProductosPublicos } from '../services/productoService';
 
-function Productos() {
+function Productos({ debounceMs = 200 } = {}) {
   const { addToCart } = useCart();
-  const catalogo = useMemo(() => obtenerCatalogoActivo(), []);
+  const [catalogo, setCatalogo] = useState(() => obtenerCatalogoActivo());
 
   const [busqueda, setBusqueda] = useState('');
+  const [busquedaDebounced, setBusquedaDebounced] = useState('');
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('Todas');
   const [orden, setOrden] = useState('relevancia');
+
+  useEffect(() => {
+    let activo = true;
+
+    async function cargarCatalogo() {
+      try {
+        const productosRemotos = await obtenerProductosPublicos();
+        if (activo && Array.isArray(productosRemotos) && productosRemotos.length > 0) {
+          setCatalogo(productosRemotos);
+        }
+      } catch {
+        // Fallback manejado internamente o conserva catálogo local activo
+      }
+    }
+
+    cargarCatalogo();
+
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(
+      () => {
+        setBusquedaDebounced(busqueda);
+      },
+      busqueda.trim() === '' ? 0 : debounceMs
+    );
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [busqueda, debounceMs]);
+
+  const categoriasDisponibles = useMemo(
+    () => extraerCategoriasUnicas(catalogo),
+    [catalogo]
+  );
 
   const productosFiltrados = useMemo(() => {
     let resultado = [...catalogo];
@@ -23,11 +65,11 @@ function Productos() {
       );
     }
 
-    // Filtro por búsqueda de texto
-    const query = busqueda.trim().toLowerCase();
+    // Filtro por búsqueda de texto debounced
+    const query = busquedaDebounced.trim().toLowerCase();
     if (query) {
       resultado = resultado.filter((p) => {
-        const texto = `${p.nombre || ''} ${p.marca || ''} ${p.modelo || ''} ${p.codigo || ''} ${p.descripcion || ''}`.toLowerCase();
+        const texto = `${p.nombre || ''} ${p.categoria || ''} ${p.marca || ''} ${p.modelo || ''} ${p.codigo || ''} ${p.descripcion || ''}`.toLowerCase();
         return texto.includes(query);
       });
     }
@@ -44,7 +86,7 @@ function Productos() {
     }
 
     return resultado;
-  }, [catalogo, categoriaSeleccionada, busqueda, orden]);
+  }, [catalogo, categoriaSeleccionada, busquedaDebounced, orden]);
 
   return (
     <Container className="py-4 catalogo-page" as="section" aria-label="Catálogo completo de productos">
@@ -64,6 +106,7 @@ function Productos() {
         orden={orden}
         onOrdenChange={setOrden}
         totalResultados={productosFiltrados.length}
+        categorias={categoriasDisponibles}
       />
 
       {/* Grilla de Productos */}
@@ -90,5 +133,9 @@ function Productos() {
     </Container>
   );
 }
+
+Productos.propTypes = {
+  debounceMs: PropTypes.number,
+};
 
 export default Productos;
