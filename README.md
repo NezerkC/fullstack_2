@@ -175,3 +175,137 @@ git commit -m "test(validaciones): agregar pruebas de borde para formulario de r
 git commit -m "style(ui): ajustar espaciado responsive en tarjetas de producto"
 git commit -m "feat(infra): agregar dockerfile multi-stage y compose con nginx"
 ```
+
+---
+
+## 7. Extracción Modular de Landing Comercial (Showcase)
+
+Para facilitar la reutilización de componentes en sitios comerciales o páginas de aterrizaje independientes sin acoplamiento a enrutadores (`react-router-dom`) ni contextos globales (`CartContext`), el paquete incluye el módulo `showcase`:
+
+```javascript
+import { ProductShowcaseGrid, MiniCartDrawer } from './src/components/showcase';
+```
+
+### Componentes Disponibles
+
+#### `<ProductShowcaseGrid />`
+Catálogo en cuadrícula con diseño responsivo, soporte de tematización mediante variables CSS y filtrado dinámico por categorías.
+
+- **Props:**
+  - `productos` (`Array<Object>`): Lista de productos a renderizar (`codigo`, `nombre`, `precio`, `stock`, `categoria`, `imagen`).
+  - `brandConfig` (`Object`): Configuración de marca (`nombre`, `tagline`, `colorPrimario`, `colorAcento`, `logoUrl`, `ctaTexto`).
+  - `onAddToCart` (`Function`): Callback ejecutado al presionar el botón de compra `(producto) => void`.
+  - `onSelectProduct` (`Function`, opcional): Callback al hacer clic en la tarjeta o título del producto.
+  - `mostrarFiltros` (`Boolean`, default `true`): Habilita o deshabilita los botones de filtro por categoría.
+  - `categoriaInicial` (`String`, default `'Todas'`): Categoría preseleccionada.
+
+#### `<MiniCartDrawer />`
+Panel lateral (`Offcanvas`) completamente controlado por props para visualizar el carrito, ajustar cantidades y calcular desglose tributario (Subtotal neto, IVA 19% y Total CLP).
+
+- **Props:**
+  - `isOpen` (`Boolean`, requerido): Controla la visibilidad del drawer.
+  - `onClose` (`Function`, requerido): Callback ejecutado al cerrar el panel.
+  - `items` (`Array<Object>`): Artículos en el carrito (`codigo`, `nombre`, `precio`, `cantidad`).
+  - `onUpdateQuantity` (`Function`): Callback `(codigo, nuevaCantidad) => void`.
+  - `onRemoveItem` (`Function`): Callback `(codigo) => void`.
+  - `onClearCart` (`Function`, opcional): Callback para vaciar el carrito completo.
+  - `onCheckout` (`Function`): Callback ejecutado al presionar el botón de pago.
+  - `brandConfig` (`Object`): Configuración de estilos (`nombre`, `colorPrimario`, `colorAcento`).
+  - `titulo` (`String`, default `'Tu Carrito'`): Título del encabezado.
+
+### Ejemplo de Integración en Landing Independiente
+
+```jsx
+import React, { useState } from 'react';
+import { Button } from 'react-bootstrap';
+import { ProductShowcaseGrid, MiniCartDrawer } from './src/components/showcase';
+
+const CATALOGO = [
+  {
+    codigo: 'G-01',
+    nombre: 'Guitarra Custom Luthier',
+    precio: 350000,
+    stock: 3,
+    categoria: 'Guitarras',
+    imagen: 'https://images.unsplash.com/photo-guitar.jpg',
+  },
+  {
+    codigo: 'B-01',
+    nombre: 'Bajo Jazz Master',
+    precio: 420000,
+    stock: 0,
+    categoria: 'Bajos',
+    imagen: 'https://images.unsplash.com/photo-bass.jpg',
+  },
+];
+
+export default function LandingComercial() {
+  const [cartItems, setCartItems] = useState([]);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const brandConfig = {
+    nombre: 'Olivini Exclusive',
+    tagline: 'Instrumentos y Alta Fidelidad Musical',
+    colorPrimario: '#121212',
+    colorAcento: '#c5a059',
+    ctaTexto: 'Comprar',
+  };
+
+  const handleAddToCart = (producto) => {
+    setCartItems((prev) => {
+      const exists = prev.find((item) => item.codigo === producto.codigo);
+      if (exists) {
+        return prev.map((item) =>
+          item.codigo === producto.codigo
+            ? { ...item, cantidad: item.cantidad + 1 }
+            : item
+        );
+      }
+      return [...prev, { ...producto, cantidad: 1 }];
+    });
+    setIsDrawerOpen(true);
+  };
+
+  const handleUpdateQuantity = (codigo, nextQty) => {
+    if (nextQty <= 0) {
+      handleRemoveItem(codigo);
+    } else {
+      setCartItems((prev) =>
+        prev.map((i) => (i.codigo === codigo ? { ...i, cantidad: nextQty } : i))
+      );
+    }
+  };
+
+  const handleRemoveItem = (codigo) => {
+    setCartItems((prev) => prev.filter((i) => i.codigo !== codigo));
+  };
+
+  return (
+    <main>
+      <header className="p-3 d-flex justify-content-end bg-dark">
+        <Button variant="warning" onClick={() => setIsDrawerOpen(true)}>
+          Ver Carrito ({cartItems.reduce((acc, i) => acc + i.cantidad, 0)})
+        </Button>
+      </header>
+
+      <ProductShowcaseGrid
+        productos={CATALOGO}
+        brandConfig={brandConfig}
+        onAddToCart={handleAddToCart}
+      />
+
+      <MiniCartDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        items={cartItems}
+        brandConfig={brandConfig}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemoveItem={handleRemoveItem}
+        onClearCart={() => setCartItems([])}
+        onCheckout={() => alert('Redirigiendo a pasarela de pagos...')}
+      />
+    </main>
+  );
+}
+```
+
